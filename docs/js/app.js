@@ -101,7 +101,7 @@ function normP(r){
     imgs:Array.isArray(r.images)?r.images.filter(okAsset).slice(0,8):[],p:nn(r.price,0,1e6),o:nn(r.list_price,0,1e6),stock:Math.floor(nn(r.stock,0,1e5)),cpn:nn(r.coupon,0,1e5),
     same:!!r.same_day,cod:r.cod!==false,ar:str(r.title_ar,220),en:str(r.title_en,220),model:str(r.model,60),w:str(r.weight,30),kg:nn(r.kg,0,1000),dim:pair(r.dims,60),mat:pair(r.material,80),
     war:Math.floor(nn(r.warranty,0,10)),org:pair(r.origin,40),v:{t:pair(v.t,30),o:opts},b:Array.isArray(r.bullets)?r.bullets.slice(0,8).map(x=>pair(x,240)).filter(x=>x[0]||x[1]):[],
-    active:r.active!==false,hidden:!!r.hidden,sold:Math.floor(nn(r.sold,0,1e9)),co:r.co&&typeof r.co==='object'?r.co:{},sample:false,createdAt:ts(r.created_at)};
+    active:r.active!==false,hidden:!!r.hidden,mod:['pending','approved','flagged','rejected'].includes(r.mod_status)?r.mod_status:'pending',modWhy:Array.isArray(r.mod_reasons)?r.mod_reasons.filter(x=>typeof x==='string').slice(0,6).map(x=>x.slice(0,300)):[],sold:Math.floor(nn(r.sold,0,1e9)),co:r.co&&typeof r.co==='object'?r.co:{},sample:false,createdAt:ts(r.created_at)};
   if(!p.v.t[0]&&!p.v.t[1])p.v.t=['الخيار','Option'];
   if(p.o<=p.p)p.o=0;
   if(p.cpn>=p.p)p.cpn=0;
@@ -124,8 +124,9 @@ const normR=r=>({id:r.id,pid:r.product_id,s:r.shop_id,by:r.user_id,r:Math.round(
   hv:Array.isArray(r.helpful)?r.helpful:[],reply:str(r.reply,1500),at:ts(r.updated_at||r.created_at)});
 const normA=r=>({id:r.id,uid:r.user_id,c:r.category,t:str(r.title,120),d:str(r.description,3000),p:nn(r.price,0,1e7),cond:r.condition==='new'?'new':'used',city:cityOf(r.city).k,
   phone:str(r.contact_phone,16),showPhone:!!r.show_phone,e:EMOJIS.includes(r.emoji)?r.emoji:'📦',imgs:Array.isArray(r.images)?r.images.filter(okAsset).slice(0,8):[],
-  status:r.status,note:str(r.status_note,500),until:ts(r.paid_until),createdAt:ts(r.created_at)});
-const adLive=a=>a&&a.status==='live'&&a.until>Date.now();
+  status:r.status,note:str(r.status_note,500),until:ts(r.paid_until),mod:['pending','approved','flagged','rejected'].includes(r.mod_status)?r.mod_status:'pending',modWhy:Array.isArray(r.mod_reasons)?r.mod_reasons.filter(x=>typeof x==='string').slice(0,6).map(x=>x.slice(0,300)):[],releaseAt:ts(r.release_at),createdAt:ts(r.created_at)});
+// customers see an ad once it's paid, passed review and its holding time is over
+const adLive=a=>!!a&&a.status==='live'&&a.until>Date.now()&&a.mod==='approved'&&a.releaseAt<=Date.now();
 
 /* ───────── what belongs to whom ───────── */
 const isMine=owner=>!!owner&&!!ME.uid&&owner===ME.uid;
@@ -134,7 +135,7 @@ const prod=id=>D.products[id]||null;
 const modS=id=>{const s=store(id);return s?{hidden:s.status==='suspended',ver:s.ver,ful:s.ful}:{};};
 const modP=id=>{const p=prod(id);return p?{hidden:p.hidden}:{};};
 const storeLive=s=>!!s&&s.status==='approved';
-const visible=p=>!!p&&p.active&&!p.hidden&&storeLive(store(p.s))&&p.p>0;
+const visible=p=>!!p&&p.active&&!p.hidden&&p.mod==='approved'&&storeLive(store(p.s))&&p.p>0;
 const allProds=()=>Object.values(D.products).filter(visible);
 const storeProds=sid=>allProds().filter(p=>p.s===sid);
 const ful=s=>!!(s&&s.ful);
@@ -181,7 +182,7 @@ async function loadCatalog(){
       q(sb.from('follows').select('shop_id,user_id').limit(5000)),q(sb.from('ads').select('*').order('created_at',{ascending:false}).limit(500))]);
     const s=st[0]||{};
     D.settings={freeOver:nn(s.free_over,0,1e4),std:nn(s.fee_std,0,1e4),next:nn(s.fee_next,0,1e4),same:nn(s.fee_same,0,1e4),cod:nn(s.fee_cod,0,1e4),gift:nn(s.fee_gift,0,1e4),
-      comm:nn(s.comm,0,50),adFee:nn(s.ad_fee,0,1e4),adDays:Math.floor(nn(s.ad_days,1,365)),payInfo:str(s.pay_info,1000),termsV:s.terms_version||1};
+      comm:nn(s.comm,0,50),adFee:nn(s.ad_fee,0,1e4),adDays:Math.floor(nn(s.ad_days,1,365)),payInfo:str(s.pay_info,1000),termsV:s.terms_version||1,reviewMin:Math.floor(nn(s.review_minutes,0,1440))};
     if(!st[0])D.settings={...DEF};
     intoMap(D.stores,sh.map(normS));
     intoMap(D.products,pr.map(normP));
@@ -456,6 +457,19 @@ function headerBits(){
   if(ME.offline){rb.hidden=false;rb.innerHTML=`<div class="wrap">${L('ما قدرنا نتصل بنيل +. تأكد من الإنترنت وحدّث الصفحة.','Couldn’t reach NILE+. Check your connection and refresh.')}</div>`;}
   else if(ME.banned){rb.hidden=false;rb.innerHTML=`<div class="wrap">${L('حسابك موقوف. تقدر تتصفح فقط.','Your account is suspended. You can browse only.')}</div>`;}
   else rb.hidden=true;
+}
+
+/* ───────── review before publishing (shown to the post's owner) ───────── */
+const modPill=x=>({pending:`<span class="stp st-placed">🔍 ${L('قيد المراجعة','Under review')}</span>`,flagged:`<span class="stp st-return_req">⚠ ${L('يحتاج تعديل','Needs changes')}</span>`,
+  rejected:`<span class="stp st-cancelled">✖ ${L('مرفوض','Rejected')}</span>`,approved:''})[x.mod]||'';
+function modBox(x,kind){
+  if(x.mod==='approved')return'';
+  const t={pending:kind==='ad'?L('إعلانك قيد المراجعة الآلية. نتأكد إنه مناسب وإن سعره واقعي، وعادةً تخلص خلال دقائق.','Your ad is being reviewed automatically for suitability and a realistic price. This usually takes minutes.')
+      :L('المنتج قيد المراجعة الآلية للتأكد إن المنشور واضح وصريح. عادةً تخلص خلال دقائق.','This product is being reviewed automatically to make sure the listing is clear and accurate. This usually takes minutes.'),
+    flagged:kind==='ad'?L('المراجعة لقت ملاحظات، وإدارة نيل + بتراجع الإعلان بنفسها:','The review found issues, and NILE+ will check the ad itself:')
+      :L('المراجعة لقت ملاحظات. عدّل المنتج حسبها ويرجع للمراجعة تلقائيًا:','The review found issues. Fix them and the product is reviewed again automatically:'),
+    rejected:L('رفضت إدارة نيل + هذا المنشور:','NILE+ rejected this post:')}[x.mod];
+  return`<div class="modbox m-${x.mod}"><b>${t}</b>${x.modWhy.length?`<ul>${x.modWhy.map(r=>`<li dir="auto">${esc(r)}</li>`).join('')}</ul>`:''}</div>`;
 }
 
 /* ───────── home ───────── */
@@ -1120,7 +1134,7 @@ function vSell(){
     body=`<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px"><button class="btn red" style="width:auto" data-edit="new">+ ${L('أضف منتج','Add a product')}</button><span class="muted" style="font-size:13px">${L('المنتجات الموقوفة ما تظهر للعملاء.','Paused products are hidden from customers.')}</span></div>
      ${ps.length?`<div class="tbl-wrap"><table class="adm"><tr><th>${L('المنتج','Product')}</th><th>${L('السعر','Price')}</th><th>${L('المخزون','Stock')}</th><th>${L('المبيعات','Sold')}</th><th>${L('التقييم','Rating')}</th><th>${L('الحالة','Status')}</th><th></th></tr>
      ${ps.map(p=>{const r=ratingOf(p.id),hid=modP(p.id).hidden;return`<tr><td><div class="tp2"><span class="e">${pimg(p)}</span><span class="clamp2">${pname(p)}</span></div></td><td class="tn">${money(p.p)}</td><td class="tn ${p.stock<=5?'redc':''}">${num(p.stock)}</td><td class="tn">${num(p.sold)}</td><td class="tn">${r.n?num(r.avg)+' ★ ('+num(r.n)+')':'—'}</td>
-      <td>${hid?`<span class="stp st-cancelled">${L('أخفته الإدارة','Hidden by NILE+')}</span>`:p.active?`<span class="stp st-delivered">${L('معروض','Live')}</span>`:`<span class="stp st-placed">${L('موقوف','Paused')}</span>`}</td>
+      <td>${p.mod!=='approved'?modPill(p)+(p.modWhy.length?`<div class="muted clamp2" style="font-size:11.5px;max-width:220px" dir="auto">${esc(p.modWhy[0])}</div>`:''):hid?`<span class="stp st-cancelled">${L('أخفته الإدارة','Hidden by NILE+')}</span>`:p.active?`<span class="stp st-delivered">${L('معروض','Live')}</span>`:`<span class="stp st-placed">${L('موقوف','Paused')}</span>`}</td>
       <td><div class="acts2"><button class="lnk" data-edit="${p.id}">${L('تعديل','Edit')}</button><button class="lnk" data-ptoggle="${p.id}">${p.active?L('إيقاف','Pause'):L('عرض','Publish')}</button>${visible(p)?`<button class="lnk" data-open="${p.id}">${L('شوفه','View')}</button>`:''}</div></td></tr>`;}).join('')}</table></div>`
      :`<div class="panel" style="text-align:center"><p>${L('ما أضفت منتجات للحين.','You haven’t added products yet.')}</p><button class="btn red" style="width:auto" data-edit="new">+ ${L('أضف أول منتج','Add your first product')}</button></div>`}`;
   }
@@ -1180,6 +1194,7 @@ function vEdit(){
   const e=ED;if(!e)return vSell();
   return`<div class="wrap"><section style="margin-top:16px"><button class="lnk" data-act="sell">‹ ${L('مركز البائع','Seller Center')}</button>
    <h2 style="font-size:22px;margin:8px 0 12px">${e.isNew?L('أضف منتج','Add a product'):L('تعديل المنتج','Edit product')}</h2>
+   ${e.isNew?`<div class="note" style="margin:0 0 12px">${L('كل منتج يمر على مراجعة آلية قبل ما يظهر للعملاء: اسم واضح يذكر العلامة والنوع، سعر واقعي، وصور للمنتج نفسه.','Every product is reviewed automatically before customers see it: a clear name with brand and type, a realistic price, and photos of the product itself.')}</div>`:modBox(e,'product')}
    <form id="pform" class="form-cols">
     <div class="panel" style="margin:0"><h3 class="h3">${L('الأساسيات','Basics')}</h3><div class="form">
      ${fld('pe_ar',L('اسم المنتج بالعربي','Product name in Arabic'),inp('pe_ar',e.ar,'maxlength="200"'),true,L('اكتب العلامة والنوع وأهم ميزة، مثل: «سماعات صوت تك برو لاسلكية عازلة للضوضاء».','Brand, type and key feature, e.g. “SawtTech Pro wireless noise-cancelling headphones”.'))}
@@ -1460,6 +1475,7 @@ function vPostAd(){
      ${a.imgs.length<8?`<label class="ph add"><input type="file" id="adimgs" accept="image/*" multiple hidden><span>+<br><small>${L('أضف صور','Add photos')}</small></span></label>`:''}</div>
     ${S.uploading?`<p class="muted">${L('جاري رفع الصور…','Uploading photos…')}</p>`:''}
     <div class="fld" style="margin-top:8px"><span class="flab">${L('رمز يظهر لو ما فيه صورة','Icon shown when there’s no photo')}</span><div class="emos">${EMOJIS.map(x=>`<label class="emopick"><input type="radio" name="ad_e" value="${x}" ${a.e===x?'checked':''}><span>${x}</span></label>`).join('')}</div></div>
+    <div class="note">${L(`قبل النشر نراجع كل إعلان آليًا: ممنوع أي غرض مخالف أو محتوى غير لائق، والسعر لازم يكون واقعي. الإعلان يتعلّق ${num(S2().reviewMin)} دقيقة للمراجعة قبل ما يظهر.`,`Every ad is reviewed automatically before it shows: no prohibited items or improper content, and the price must be realistic. Ads are held ${S2().reviewMin} minutes for review before going live.`)}</div>
     <h3 class="h3" style="margin-top:16px">${L('الدفع','Payment')}</h3>
     ${S2().adFee?payBox(a.method,a.ref):`<div class="note">${L('نشر الإعلانات مجاني حاليًا.','Posting ads is free for now.')}</div>`}
     ${S.err?`<p class="err" role="alert">${esc(S.err)}</p>`:''}
@@ -1480,7 +1496,7 @@ async function submitAd(){
       p_method:a.method,p_reference:a.ref.slice(0,80)});
     if(phone&&!ME.doc.phone){ME.doc.phone=phone;saveMe();}
     S.busy=false;AD=null;await Promise.all([loadCatalog(),loadMine()]);
-    toast(S2().adFee?L('وصل إعلانك. ينزل أول ما تأكد الإدارة الدفع.','Ad received. It goes live once NILE+ confirms the payment.'):L('انتشر إعلانك','Your ad is live'));
+    toast(L(`وصل إعلانك. نراجعه، وينزل بعد ${num(S2().reviewMin)} دقيقة تقريبًا${S2().adFee?' من تأكيد الدفع':''}.`,`Ad received. We review it and it goes live in about ${S2().reviewMin} minutes${S2().adFee?' after payment is confirmed':''}.`));
     go('myads');
   }catch(e){S.busy=false;bad(dbErr(e));}
 }
@@ -1492,21 +1508,25 @@ function vMyAds(){
     if(a.status==='sold')return['st-delivered',L('انباع','Sold')];
     if(a.status==='removed')return['st-cancelled',L('محذوف','Removed')];
     if(a.status==='rejected')return['st-cancelled',L('مرفوض','Rejected')];
+    if(a.mod==='rejected')return['st-cancelled',L('رفضته الإدارة','Rejected by NILE+')];
+    if(a.status==='live'&&a.until>Date.now()&&a.mod!=='approved')return a.mod==='flagged'?['st-return_req',L('تحت مراجعة الإدارة','With NILE+ for review')]:['st-placed',L('قيد المراجعة','Under review')];
+    if(a.status==='live'&&a.until>Date.now()&&a.releaseAt>Date.now())return['st-placed',L(`ينزل بعد ${num(Math.ceil((a.releaseAt-Date.now())/6e4))} دقيقة`,`Goes live in ${Math.ceil((a.releaseAt-Date.now())/6e4)} min`)];
     if(a.status==='live'&&a.until>Date.now())return['st-delivered',L(`ظاهر · باقي ${num(daysLeft(a))} يوم`,`Live · ${daysLeft(a)} days left`)];
     if(a.status==='live')return['st-cancelled',L('انتهت مدته','Expired')];
     const p=pay(a);return p&&p.status==='rejected'?['st-return_req',L('الدفع ما تأكد','Payment not confirmed')]:['st-placed',L('ينتظر تأكيد الدفع','Waiting for payment confirmation')];
   };
   return`<div class="wrap"><section style="margin-top:16px"><button class="lnk" data-act="account">‹ ${L('حسابك','Your account')}</button>
    <div class="orow" style="margin:8px 0 12px"><h2 style="font-size:24px;margin:0">${L('إعلاناتي','My ads')}</h2><button class="btn red" style="width:auto" data-act="postad">+ ${L('إعلان جديد','New ad')}</button></div>
-   ${l.length?l.map(a=>{const [cls,txt]=state(a),p=pay(a),pend=p&&p.status==='pending',exp=a.status==='live'&&a.until<=Date.now(),open=['awaiting_payment','live'].includes(a.status);
+   ${l.length?l.map(a=>{const [cls,txt]=state(a),p=pay(a),pend=p&&p.status==='pending',exp=a.status==='live'&&a.until<=Date.now(),open=['awaiting_payment','live'].includes(a.status)&&a.mod!=='rejected';
     return`<div class="ocard"><div class="ob" style="display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap">
      <button class="mini" style="width:72px;height:72px;font-size:34px;border:0;cursor:pointer" data-adopen="${a.id}">${adImg(a)}</button>
      <div style="flex:1;min-width:200px"><b dir="auto">${esc(a.t)}</b><div class="tn">${money(a.p)}</div><div style="margin-top:4px"><span class="stp ${cls}">${txt}</span></div>
       ${p&&p.status==='rejected'&&p.note?`<div class="note" style="margin-top:6px">${L('ملاحظة الإدارة:','Note from NILE+:')} ${esc(p.note)}</div>`:''}
       ${a.note?`<div class="note" style="margin-top:6px">${esc(a.note)}</div>`:''}
+      ${['awaiting_payment','live'].includes(a.status)?modBox(a,'ad'):''}
       ${pend?`<div class="muted" style="font-size:12.5px;margin-top:6px">${L(`دفعة ${money(p.amount)} وصلت للإدارة ${ago(p.at)}، وتنتظر التأكيد.`,`A ${money(p.amount)} payment reached NILE+ ${ago(p.at)} and is awaiting confirmation.`)}</div>`:''}</div>
      <div class="acts2">${open&&!pend&&(exp||a.status==='awaiting_payment'||daysLeft(a)<=7)?`<button class="btn red" style="width:auto" data-adrenew="${a.id}">${a.status==='awaiting_payment'?L('أرسل الدفع مرة ثانية','Send payment again'):L(`جدّد (${money(S2().adFee)})`,`Renew (${money(S2().adFee)})`)}</button>`:''}
-      ${a.status==='live'&&!exp?`<button class="btn out" style="width:auto" data-adsold="${a.id}">${L('انباع','Mark sold')}</button>`:''}
+      ${a.status==='live'&&!exp&&a.mod==='approved'?`<button class="btn out" style="width:auto" data-adsold="${a.id}">${L('انباع','Mark sold')}</button>`:''}
       ${open?`<button class="btn out" style="width:auto" data-adremove="${a.id}">${L('احذف الإعلان','Remove ad')}</button>`:''}</div>
     </div></div>`;}).join(''):`<div class="panel" style="text-align:center"><p>${L(`ما عندك إعلانات. أعلن عن أي غرض بـ${num(S2().adFee)} ريال.`,`No ads yet. List any item for ${S2().adFee} QAR.`)}</p><button class="btn red" style="width:auto" data-act="postad">${L('أعلن عن غرضك','Post your item')}</button></div>`}
   </section></div>`;

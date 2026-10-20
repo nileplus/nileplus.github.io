@@ -533,3 +533,16 @@ a{color:var(--link)}
 .pbadge,.im img.pbadge,.mainim img.pbadge{position:absolute;top:6px;inset-inline-end:6px;width:58px;height:auto;object-fit:initial;pointer-events:none;filter:drop-shadow(0 1px 2px rgba(0,0,0,.18))}
 img.pbadge.big{position:static;width:88px;display:block;margin-bottom:4px}
 @media (max-width:520px){.pbadge,.im img.pbadge{width:46px}}
+.modbox{border-radius:8px;padding:10px 12px;margin:8px 0 12px;font-size:13.5px;border:1px solid var(--line);background:var(--soft)}
+.modbox ul{margin:6px 0 0;padding-inline-start:20px}
+.modbox.m-pending{background:#eef3fb;border-color:#c9d8ee}
+.modbox.m-flagged{background:#fff1dc;border-color:#f1d29c}
+.modbox.m-rejected{background:#fdecec;border-color:#f3c3c5}
+.kpis .kbtn{background:var(--white);border:1px solid var(--line);padding:12px;text-align:center;font-size:12.5px;cursor:pointer;font:inherit;font-size:12.5px;color:inherit;display:flex;flex-direction:column;align-items:center;gap:2px}
+.kpis .kbtn:hover{border-color:var(--red)}
+.kpis .kbtn b{display:block;font-size:18px;font-variant-numeric:tabular-nums}
+.kpis .kbtn small{color:var(--link);font-size:11.5px}
+table.adm tr.totrow td{font-weight:700;background:#fafafa;border-top:2px solid var(--line)}
+.revcard.flagged{border-inline-start:4px solid #e08a00}
+.revimgs{display:flex;gap:6px;flex-wrap:wrap;max-width:280px}
+.revimgs img{width:64px;height:64px;object-fit:cover;border-radius:6px;border:1px solid var(--line)}
