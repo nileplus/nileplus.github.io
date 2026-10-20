@@ -1384,7 +1384,7 @@ function vMoney(s,os,ps){
 /* ───────── NILE+ owner dashboard ─────────
    Only accounts in the admins table get data here; the database refuses everyone else. */
 const AD_={shops:{},priv:{},orders:{},ads:{},pays:[],payouts:[],reports:[],users:[],docs:{},loaded:false};
-const AS={tab:'home',ordF:'all',adF:'pending',shopF:'all',q:'',detail:''};
+const AS={tab:'home',ordF:'all',adF:'pending',shopF:'all',q:'',detail:'',per:'month'};
 
 /* ───── loading ───── */
 async function aLoad(){
@@ -1439,6 +1439,30 @@ const uname=id=>{const u=userOf(id);return `<span>${esc(u.full_name||'—')}</sp
 const shopStatus=s=>`<span class="stp ${{pending:'st-placed',approved:'st-delivered',rejected:'st-cancelled',suspended:'st-return_req'}[s.status]}">${{pending:L('قيد المراجعة','Pending'),approved:L('معتمد','Approved'),rejected:L('مرفوض','Rejected'),suspended:L('موقوف','Suspended')}[s.status]}</span>`;
 
 /* ───── pages ───── */
+
+/* ───── completed vs not-completed orders ───── */
+// done = the customer received and kept it; open = still on its way; ret = returned or being returned; cancelled = never delivered
+const OB_=()=>[['done',L('تمّت','Completed'),'✅',o=>['delivered','return_rej'].includes(o.status)],['open',L('جارية','In progress'),'🚚',o=>['placed','packed','shipped','out'].includes(o.status)],
+  ['ret',L('مرتجعة','Returned'),'↩️',o=>['return_req','returned','refunded'].includes(o.status)],['cancelled',L('ملغاة','Cancelled'),'✖',o=>o.status==='cancelled']];
+const PER_=()=>[['today',L('اليوم','Today')],['7',L('آخر ٧ أيام','Last 7 days')],['month',L('هالشهر','This month')],['all',L('من البداية','All time')]];
+function perFrom(){const n=new Date();return {today:new Date(n.getFullYear(),n.getMonth(),n.getDate()).getTime(),'7':Date.now()-7*864e5,month:new Date(n.getFullYear(),n.getMonth(),1).getTime(),all:0}[AS.per]??0;}
+const perOrders=()=>Object.values(AD_.orders).filter(o=>o.createdAt>=perFrom());
+// cancelled and returned orders earn no commission or fees
+function sumOf(l){return l.reduce((a,o)=>{const m=orderMoney(o),lost=['cancelled','return_req','returned','refunded'].includes(o.status);a.n++;a.total+=o.total;a.sales+=m.sales;if(!lost){a.comm+=m.comm;a.fees+=o.fees.del+o.fees.cod+o.fees.gift;}return a;},{n:0,total:0,sales:0,comm:0,fees:0});}
+const perChips=()=>`<div class="chips" style="margin:0 0 10px">${PER_().map(([k,t])=>`<button class="chip" data-per="${k}" aria-pressed="${AS.per===k}">${t}</button>`).join('')}</div>`;
+function ordersSummary(){
+  const l=perOrders(),b=Object.fromEntries(OB_().map(([k,,,f])=>[k,sumOf(l.filter(f))])),not=sumOf(l.filter(o=>!OB_()[0][3](o))),closed=b.done.n+b.ret.n+b.cancelled.n;
+  return`<section class="panel"><div class="orow"><h3 class="h3" style="margin:0">${L('حسبة الطلبات','Orders tally')}</h3><span class="muted" style="font-size:12.5px">${L(`${num(l.length)} طلب`,`${l.length} orders`)}</span></div>
+   <div style="margin-top:8px">${perChips()}</div>
+   <div class="obig"><button class="ob ok" data-aordgo="done"><span>${OB_()[0][2]} ${OB_()[0][1]}</span><b>${num(b.done.n)}</b><small>${money(b.done.total)}</small></button>
+    <button class="ob no" data-aordgo="notdone"><span>⏳ ${L('لم تتم','Not completed')}</span><b>${num(not.n)}</b><small>${money(not.total)}</small></button></div>
+   <div class="tbl-wrap" style="margin-top:10px"><table class="adm"><tr><th>${L('الحالة','Status')}</th><th>${L('العدد','Count')}</th><th>${L('قيمة الطلبات','Order value')}</th><th>${L('قيمة المنتجات','Items value')}</th><th>${L('عمولتك','Your commission')}</th><th>${L('رسوم التوصيل والدفع','Delivery & payment fees')}</th></tr>
+    ${OB_().map(([k,t,ic])=>{const x=b[k],act=k==='done',exp=k==='open';return`<tr class="clk" data-aordgo="${k}"><td>${ic} ${t}</td><td class="tn"><b>${num(x.n)}</b></td><td class="tn">${money(x.total)}</td><td class="tn">${money(x.sales)}</td>
+     <td class="tn">${act?`<b class="okc">${money(x.comm)}</b>`:exp?`<span class="muted">${money(x.comm)} ${L('متوقعة','expected')}</span>`:`<span class="muted">—</span>`}</td><td class="tn">${act?money(x.fees):exp?`<span class="muted">${money(x.fees)}</span>`:'—'}</td></tr>`;}).join('')}
+    <tr class="totrow"><td>${L('الكل','All')}</td><td class="tn">${num(l.length)}</td><td class="tn">${money(sumOf(l).total)}</td><td class="tn">${money(sumOf(l).sales)}</td><td></td><td></td></tr></table></div>
+   <p class="muted" style="font-size:12.5px;margin:8px 0 0">${closed?L(`نسبة الإتمام: ${num(Math.round(b.done.n/closed*100))}٪ من الطلبات المنتهية وصلت للعميل وما رجعت.`,`Completion rate: ${Math.round(b.done.n/closed*100)}% of finished orders were delivered and kept.`):L('ما فيه طلبات منتهية في هالفترة.','No finished orders in this period.')}
+    ${L(' الطلبات الملغاة والمرتجعة ما عليها عمولة ولا رسوم.',' Cancelled and returned orders carry no commission or fees.')}</p></section>`;
+}
 function aHome(){
   const inc=siteIncome(),pend=Object.values(AD_.shops).filter(s=>s.status==='pending'),pays=AD_.pays.filter(p=>p.status==='pending'),reps=AD_.reports.filter(r=>r.status==='open');
   const owed=Object.values(AD_.shops).reduce((a,s)=>a+shopBalance(s).owed,0);
@@ -1446,6 +1470,7 @@ function aHome(){
   return`<div class="kpis"><div class="hi"><b>${money(inc.total)}</b>${L('دخل نيل +','NILE+ income')}</div><button class="kbtn" data-kdet="comm"><b>${money(inc.comm)}</b>${L('عمولات المتاجر','Shop commissions')}<small>${L('التفاصيل ‹','Details ›')}</small></button><div><b>${money(inc.fees)}</b>${L('رسوم التوصيل والدفع','Delivery & payment fees')}</div><button class="kbtn" data-kdet="ads"><b>${money(inc.ads)}</b>${L('رسوم إعلانات الأفراد','Individual ad fees')}<small>${L('التفاصيل ‹','Details ›')}</small></button>
     <div><b>${money(inc.gmv)}</b>${L('قيمة الطلبات','Order value')}</div><div><b>${num(inc.n)}</b>${L('طلبات قائمة ومكتملة','Active & completed orders')}</div><button class="kbtn" data-kdet="owed"><b class="${owed?'redc':''}">${money(owed)}</b>${L('مستحق للمتاجر الحين','Owed to shops now')}<small>${L('التفاصيل ‹','Details ›')}</small></button>
     <div><b>${num(Object.values(AD_.shops).filter(s=>s.status==='approved').length)}</b>${L('متاجر معتمدة','Approved shops')}</div><div><b>${num(live)}</b>${L('إعلانات أفراد ظاهرة','Live individual ads')}</div><div><b>${num(AD_.users.length)}</b>${L('مستخدمين','Users')}</div></div>
+   ${ordersSummary()}
    <div class="two">
     <section class="panel" style="margin:0"><h3 class="h3">${L('يحتاج قرارك','Needs your decision')}</h3>
      ${pend.length||pays.length||reps.length||owed?`<ul class="todo">${pend.length?`<li><button class="lnk" data-atab="apps">${L(`${num(pend.length)} طلب تسجيل شركة`,`${pend.length} company registrations`)}</button></li>`:''}
@@ -1498,9 +1523,10 @@ function aAds(){
 }
 const NEXT={placed:['packed','cancelled'],packed:['shipped','cancelled'],shipped:['out','delivered'],out:['delivered'],return_req:['returned','return_rej'],returned:['refunded']};
 function aOrders(){
-  const F=[['all',L('الكل','All'),()=>true],['open',L('جارية','Open'),o=>['placed','packed','shipped','out'].includes(o.status)],['done',L('مكتملة','Delivered'),o=>o.status==='delivered'],['ret',L('مرتجعات','Returns'),o=>['return_req','returned','refunded','return_rej'].includes(o.status)],['cancelled',L('ملغاة','Cancelled'),o=>o.status==='cancelled']];
-  const os=Object.values(AD_.orders),f=(F.find(x=>x[0]===AS.ordF)||F[0])[2],l=os.filter(f);
-  return`<div class="chips">${F.map(x=>`<button class="chip" data-aordf="${x[0]}" aria-pressed="${AS.ordF===x[0]}">${x[1]} (${num(os.filter(x[2]).length)})</button>`).join('')}</div>
+  const F=[['all',L('الكل','All'),()=>true],...OB_().map(([k,t,,f])=>[k,t,f]),['notdone',L('لم تتم','Not completed'),o=>!OB_()[0][3](o)]];
+  const os=perOrders(),f=(F.find(x=>x[0]===AS.ordF)||F[0])[2],l=os.filter(f).sort((a,b)=>b.createdAt-a.createdAt),t=sumOf(l);
+  return`${perChips()}<div class="chips">${F.map(x=>`<button class="chip" data-aordf="${x[0]}" aria-pressed="${AS.ordF===x[0]}">${x[1]} (${num(os.filter(x[2]).length)})</button>`).join('')}</div>
+   <div class="kpis" style="margin-top:0"><div><b>${num(t.n)}</b>${L('طلب','orders')}</div><div><b>${money(t.total)}</b>${L('قيمة الطلبات','Order value')}</div><div><b>${money(t.sales)}</b>${L('قيمة المنتجات','Items value')}</div><div><b>${money(t.comm)}</b>${L('العمولة','Commission')}</div></div>
    ${l.length?`<div class="tbl-wrap"><table class="adm"><tr><th>${L('الطلب','Order')}</th><th>${L('التاريخ','Date')}</th><th>${L('المتجر','Shop')}</th><th>${L('العميل','Customer')}</th><th>${L('المبلغ','Amount')}</th><th>${L('عمولتنا','Our commission')}</th><th>${L('الحالة','Status')}</th><th>${L('إجراء','Action')}</th></tr>
    ${l.slice(0,300).map(o=>`<tr><td class="tn" dir="ltr">${esc(o.no)}</td><td>${fmtFull(o.createdAt)}</td><td>${sname(store(o.s))}</td><td>${esc(o.addr.name)}<div class="muted" style="font-size:12px" dir="ltr">${esc(o.addr.phone)}</div></td><td class="tn">${money(o.total)}</td><td class="tn">${money(orderMoney(o).comm)}</td><td>${statusPill(o.status)}</td>
     <td>${NEXT[o.status]?`<div class="acts2"><select class="inp" id="na_${o.id}" style="width:auto;min-height:32px">${NEXT[o.status].map(k=>`<option value="${k}">${tx(ST[k])}</option>`).join('')}</select><button class="lnk" data-oact="${o.id}">${L('نفّذ','Apply')}</button></div>`:''}</td></tr>`).join('')}</table></div>`:`<div class="panel" style="text-align:center"><p class="muted">${L('ما فيه طلبات هنا.','No orders here.')}</p></div>`}`;
@@ -1645,6 +1671,8 @@ document.addEventListener('click',e=>{
   if(el=g('[data-aikey]')){const v=el.dataset.aikey==='clear'?'':$('#ai_key').value.trim();if(el.dataset.aikey!=='clear'&&!/^sk-ant-/.test(v))return toast(L('المفتاح يبدأ بـ sk-ant-','The key starts with sk-ant-'),true);
     return act(()=>rpc('admin_set_ai_key',{p_key:v}),v?L('انحفظ المفتاح، والمراجعة الآلية بدأت','Key saved; automatic review started'):L('انشال المفتاح','Key removed'));}
   if(el=g('[data-aordf]')){AS.ordF=el.dataset.aordf;render();return;}
+  if(el=g('[data-aordgo]')){AS.ordF=el.dataset.aordgo;AS.tab='orders';AS.detail='';render();scrollTo({top:0});return;}
+  if(el=g('[data-per]')){AS.per=el.dataset.per;render();return;}
   if(el=g('[data-approve]')){const id=el.dataset.approve,c=Number($('#cm_'+id).value);if(!(c>=0&&c<=50))return toast(L('العمولة من ٠ إلى ٥٠.','Commission must be 0 to 50.'),true);
     return act(()=>rpc('admin_shop_decide',{p_shop:id,p_decision:'approve',p_note:'',p_commission:c}),L('اعتمدت المتجر. يقدر يضيف منتجاته الحين.','Shop approved. It can list products now.'));}
   if(el=g('[data-reject]')){const id=el.dataset.reject,n=$('#rj_'+id).value.trim();if(!n)return toast(L('اكتب سبب الرفض.','Enter the reason.'),true);

@@ -546,3 +546,11 @@ table.adm tr.totrow td{font-weight:700;background:#fafafa;border-top:2px solid v
 .revcard.flagged{border-inline-start:4px solid #e08a00}
 .revimgs{display:flex;gap:6px;flex-wrap:wrap;max-width:280px}
 .revimgs img{width:64px;height:64px;object-fit:cover;border-radius:6px;border:1px solid var(--line)}
+.obig{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.ob{border:2px solid var(--line);border-radius:10px;padding:12px;background:var(--white);cursor:pointer;display:flex;flex-direction:column;gap:2px;align-items:center;font:inherit;color:inherit}
+.ob b{font-size:26px;font-variant-numeric:tabular-nums}
+.ob small{color:var(--muted);font-size:13px}
+.ob.ok{border-color:#9fd6b0;background:#f2fbf5}
+.ob.no{border-color:#f1d29c;background:#fffaf0}
+table.adm tr.clk{cursor:pointer}
+table.adm tr.clk:hover td{background:#fafafa}
