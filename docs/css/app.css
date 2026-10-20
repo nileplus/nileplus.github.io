@@ -554,3 +554,19 @@ table.adm tr.totrow td{font-weight:700;background:#fafafa;border-top:2px solid v
 .ob.no{border-color:#f1d29c;background:#fffaf0}
 table.adm tr.clk{cursor:pointer}
 table.adm tr.clk:hover td{background:#fafafa}
+/* advertising banners */
+.bhero{height:clamp(150px,31vw,440px)}
+.bhero .slide{padding:0;border:0;background:#111;display:block;width:100%;height:100%}
+.bhero .slide img{width:100%;height:100%;object-fit:cover;display:block}
+.bhero .arrow{top:50%;bottom:auto;transform:translateY(-50%);width:40px;height:40px;border-radius:50%;background:rgba(0,0,0,.45);color:#fff;font-size:26px;margin-inline:10px}
+.bhero .dots{position:absolute;bottom:10px;left:0;right:0;display:flex;gap:6px;justify-content:center;z-index:2}
+.bhero .dots i{width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,.55)}
+.bhero .dots i.on{background:#fff}
+.bhero + .wrap .cards{margin-top:18px}
+.adtag{position:absolute;top:8px;inset-inline-start:8px;background:rgba(0,0,0,.6);color:#fff;font-size:11px;font-weight:600;padding:1px 7px;border-radius:3px}
+.mbanners{display:grid;gap:14px;margin-top:18px}
+.mbanners.n2{grid-template-columns:repeat(2,minmax(0,1fr))}
+@media (max-width:720px){.mbanners.n2{grid-template-columns:minmax(0,1fr)}}
+.mbn{position:relative;padding:0;border:0;background:#eee;cursor:pointer;aspect-ratio:8/3;max-width:100%;overflow:hidden;border-radius:6px}
+.mbn img{width:100%;height:100%;object-fit:cover;display:block}
+.bthumb{width:120px;height:44px;object-fit:cover;border-radius:4px;border:1px solid var(--line);display:block}

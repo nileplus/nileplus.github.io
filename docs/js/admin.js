@@ -38,7 +38,7 @@ const S={ar:true,view:'home',cat:'all',q:'',fav:false,slide:0,sort:'feat',minR:0
   adCat:'all',adQ:'',adId:null,joinAs:''};
 // what the database holds, as this viewer sees it
 const D={stores:{},products:{},reviews:{},questions:{},follows:{},mod:{},reports:{},settings:{...DEF},myOrders:{},sellOrders:{},allOrders:{},thrB:{},thrS:{},
-  ads:{},adPays:[],payouts:[],loaded:{stores:false,products:false}};
+  ads:{},adPays:[],payouts:[],banners:[],loaded:{stores:false,products:false}};
 // who is viewing and what they may do
 const ME={uid:null,owner:false,write:null,sb:null,email:'',name:'',banned:false,ready:false,live:false,offline:false,chan:null,
   doc:{cart:[],wish:[],addrs:[],recent:[],cpns:[],follows:[],seen:{},costs:{},phone:''}};
@@ -176,10 +176,11 @@ function intoMap(map,list){Object.keys(map).forEach(k=>delete map[k]);list.forEa
 async function loadCatalog(){
   const sb=ME.sb;
   try{
-    const [st,sh,pr,rv,qs,an,fo,ads]=await Promise.all([
+    const [st,sh,pr,rv,qs,an,fo,ads,bn]=await Promise.all([
       q(sb.from('settings').select('*').eq('id',1)),q(sb.from('shops').select('*').limit(1000)),q(sb.from('products').select('*').order('created_at',{ascending:false}).limit(1000)),
       q(sb.from('reviews').select('*').limit(1000)),q(sb.from('questions').select('*').order('created_at',{ascending:false}).limit(1000)),q(sb.from('answers').select('*').order('created_at').limit(3000)),
-      q(sb.from('follows').select('shop_id,user_id').limit(5000)),q(sb.from('ads').select('*').order('created_at',{ascending:false}).limit(500))]);
+      q(sb.from('follows').select('shop_id,user_id').limit(5000)),q(sb.from('ads').select('*').order('created_at',{ascending:false}).limit(500)),
+      q(sb.from('banners').select('id,title,advertiser,image,link,placement,starts_at,ends_at,active,sort').order('sort').order('created_at',{ascending:false}).limit(50))]);
     const s=st[0]||{};
     D.settings={freeOver:nn(s.free_over,0,1e4),std:nn(s.fee_std,0,1e4),next:nn(s.fee_next,0,1e4),same:nn(s.fee_same,0,1e4),cod:nn(s.fee_cod,0,1e4),gift:nn(s.fee_gift,0,1e4),
       comm:nn(s.comm,0,50),adFee:nn(s.ad_fee,0,1e4),adDays:Math.floor(nn(s.ad_days,1,365)),payInfo:str(s.pay_info,1000),termsV:s.terms_version||1,reviewMin:Math.floor(nn(s.review_minutes,0,1440))};
@@ -192,6 +193,7 @@ async function loadCatalog(){
     intoMap(D.questions,qs.map(x=>({id:x.id,pid:x.product_id,s:x.shop_id,by:x.user_id,q:str(x.body,600),at:ts(x.created_at),ans:byQ[x.id]||[]})));
     intoMap(D.follows,fo.map(f=>({id:f.shop_id+'_'+f.user_id,s:f.shop_id,by:f.user_id})));
     intoMap(D.ads,ads.map(normA));
+    D.banners=bn.filter(b=>okAsset(b.image)).map(b=>({id:b.id,t:str(b.title,120),by:str(b.advertiser,120),img:b.image,link:str(b.link,500),place:b.placement==='mid'?'mid':'hero',from:ts(b.starts_at),to:ts(b.ends_at),on:!!b.active}));
     D.loaded.stores=D.loaded.products=true;ME.live=true;
   }catch(e){console.warn('[NILE+] catalog',e);ME.offline=true;}
   schedule();
@@ -481,7 +483,7 @@ function emptyMarket(){
 }
 function vHome(){
   const ps=allProds();
-  if(!ps.length)return heroHTML()+emptyMarket()+`<div class="wrap">${adsRail()}</div>`;
+  if(!ps.length)return heroHTML()+`<div class="wrap">${midBanners()}</div>`+emptyMarket()+`<div class="wrap">${adsRail()}</div>`;
   const byCat=k=>ps.filter(p=>p.c===k).sort((a,b)=>b.sold-a.sold);
   const top=[...ps].sort((a,b)=>(b.sold-a.sold)||(b.createdAt-a.createdAt));
   const stores=Object.values(D.stores).filter(s=>storeLive(s)&&storeProds(s.id).length).sort((a,b)=>(storeRating(b.id).n-storeRating(a.id).n)||(storeProds(b.id).length-storeProds(a.id).length));
@@ -502,6 +504,7 @@ function vHome(){
      if(t==='s'){const s=store(k);return`<button class="qi" data-store="${k}"><div class="im">${logo(s,56)}</div><span>${sname(s)}</span></button>`;}
      const p=prod(k);return`<button class="qi" data-open="${k}"><div class="im">${pimg(p)}</div><span class="clamp2">${tx(p.sub[0]||p.sub[1]?p.sub:[cname(p.c),cname(p.c)])}</span></button>`;}).join('')}</div>
      <button class="lnk more" data-act="${a}">${more}</button></div>`).join('')}</section>
+   ${midBanners()}
    ${recent.length?`<section class="panel"><div class="ph"><h2>${L('شاهدتها مؤخرًا','Your browsing history')}</h2></div><div class="rail">${recent.map(railItem).join('')}</div></section>`:''}
    ${deals.length?`<section class="panel" id="dealsP"><div class="ph"><h2>${L('عروض اليوم','Today’s Deals')}</h2><button class="lnk" data-act="dealsAll">${L('شاهد كل العروض','See all deals')}</button></div>
      <div class="rail">${deals.map(p=>`<button class="deal" data-open="${p.id}"><div class="im">${pimg(p)}</div><div class="tags"><span class="off">${L('خصم','-')} ${num(pct(p))}٪</span><span class="lim">${L('عرض','Deal')}</span></div>${priceHTML(p)}<div class="clamp2" style="font-size:13px">${pname(p)}</div></button>`).join('')}</div></section>`:''}
@@ -511,7 +514,29 @@ function vHome(){
    <section class="panel"><div class="ph"><h2>${L('اخترناها لك','Picked for you')}</h2></div><div class="grid">${top.slice(0,40).map(card).join('')}</div></section>
    </div>`;
 }
+/* ───────── advertising banners (run by NILE+ from the dashboard) ───────── */
+const runningBanners=place=>D.banners.filter(b=>b.on&&b.place===place&&b.from<=Date.now()&&b.to>Date.now());
+const bannerImg=(b,eager)=>`<img src="${IMG(b.img)}" alt="${esc(b.t||b.by||L('إعلان','Advertisement'))}" ${eager?'':'loading="lazy"'} decoding="async">`;
+function bannerHero(B){
+  S.slide%=B.length;
+  return`<section class="hero bhero" aria-label="${L('إعلانات','Advertisements')}">${B.map((b,i)=>`<button class="slide" aria-hidden="${i!==S.slide}" data-banner="${b.id}">${bannerImg(b,i===0)}<span class="adtag">${L('إعلان','Ad')}</span></button>`).join('')}
+   ${B.length>1?`<button class="arrow prev" data-act="prev" aria-label="${L('السابق','previous')}">‹</button><button class="arrow next" data-act="next" aria-label="${L('التالي','next')}">›</button>
+   <div class="dots">${B.map((b,i)=>`<i class="${i===S.slide?'on':''}"></i>`).join('')}</div>`:''}</section>`;
+}
+function midBanners(){
+  const B=runningBanners('mid').slice(0,2);
+  return B.length?`<section class="mbanners n${B.length}">${B.map(b=>`<button class="mbn" data-banner="${b.id}">${bannerImg(b)}<span class="adtag">${L('إعلان','Ad')}</span></button>`).join('')}</section>`:'';
+}
+function openBanner(id){
+  const b=D.banners.find(x=>x.id===id);if(!b)return;
+  if(ME.sb)ME.sb.rpc('banner_click',{p_id:id}).then(()=>{},()=>{});
+  const [k,v]=b.link.split(/:(.+)/);
+  if(k==='p'&&isUuid(v))go('product',{pid:v,img:0});else if(k==='s'&&isUuid(v))go('store',{sid:v,stab:'home'});else if(k==='ad'&&isUuid(v))go('ad',{adId:v,img:0});
+  else if(/^https:\/\//.test(b.link))window.open(b.link,'_blank','noopener');
+}
 function heroHTML(){
+  const B=runningBanners('hero');if(B.length)return bannerHero(B);
+
   const SL=[['s1',L('عروض الموسم','Season deals'),L('خصومات على الإلكترونيات','Deals on electronics'),L('سماعات، مكبرات صوت وأجهزة ذكية','Headphones, speakers and smart devices'),'🎧','c:electronics'],
    ['s2',L('المتاجر','Stores'),L('تسوّق من متاجر قطرية','Shop Qatari stores'),L('كل متجر له صفحة وتقييمات حقيقية من المشترين','Every store has its own page and real buyer reviews'),'🏬','stores'],
    ['s3',L('المنزل','Home'),L('جدّد بيتك بأسعار أقل','Refresh your home for less'),L('إضاءة، أكواب وأدوات يومية','Lighting, cups and everyday essentials'),'🛋️','c:home']];
@@ -1383,7 +1408,7 @@ function vMoney(s,os,ps){
 
 /* ───────── NILE+ owner dashboard ─────────
    Only accounts in the admins table get data here; the database refuses everyone else. */
-const AD_={shops:{},priv:{},orders:{},ads:{},pays:[],payouts:[],reports:[],users:[],docs:{},loaded:false};
+const AD_={shops:{},priv:{},orders:{},ads:{},pays:[],payouts:[],reports:[],users:[],docs:{},banners:[],loaded:false};
 const AS={tab:'home',ordF:'all',adF:'pending',shopF:'all',q:'',detail:'',per:'month'};
 
 /* ───── loading ───── */
@@ -1411,6 +1436,7 @@ async function aLoad(){
     // signed links to the registration documents, valid for an hour
     const paths=Object.values(AD_.priv).map(x=>x.file).filter(Boolean);
     if(paths.length){const {data}=await sb.storage.from('cr-docs').createSignedUrls(paths,3600);(data||[]).forEach(d=>{if(d.signedUrl)AD_.docs[d.path]=d.signedUrl;});}
+    try{const bn=await q(sb.from('banners').select('*').order('created_at',{ascending:false}).limit(500));AD_.banners=bn.map(b=>({id:b.id,t:str(b.title,120),by:str(b.advertiser,120),img:b.image,link:str(b.link,500),place:b.placement,from:ts(b.starts_at),to:ts(b.ends_at),on:!!b.active,sort:b.sort,price:nn(b.price),clicks:b.clicks|0,at:ts(b.created_at)}));}catch(e){AD_.banners=[];}
     try{const {data}=await sb.rpc('admin_ai_status');AD_.ai=data||{};}catch(e){AD_.ai={};}
     try{const {data}=await sb.rpc('admin_users');AD_.users=data||[];(data||[]).forEach(u=>{if(u.full_name)NAMES[u.id]=u.full_name;});}catch(e){}
     AD_.loaded=true;
@@ -1431,8 +1457,8 @@ function shopBalance(s){
 function siteIncome(){
   let comm=0,fees=0,gmv=0,n=0;
   Object.values(AD_.orders).forEach(o=>{if(['cancelled','returned','refunded'].includes(o.status))return;n++;gmv+=o.total;comm+=orderMoney(o).comm;fees+=o.fees.del+o.fees.cod+o.fees.gift;});
-  const ads=AD_.pays.filter(p=>p.status==='confirmed').reduce((a,p)=>a+p.amount,0);
-  return {gmv,comm,fees,ads,n,total:comm+fees+ads};
+  const ads=AD_.pays.filter(p=>p.status==='confirmed').reduce((a,p)=>a+p.amount,0),bnr=AD_.banners.reduce((a,b)=>a+b.price,0);
+  return {gmv,comm,fees,ads,bnr,n,total:comm+fees+ads+bnr};
 }
 const userOf=id=>AD_.users.find(u=>u.id===id)||{};
 const uname=id=>{const u=userOf(id);return `<span>${esc(u.full_name||'—')}</span>${u.email?`<div class="muted" style="font-size:12px" dir="ltr">${esc(u.email)}</div>`:''}`;};
@@ -1467,7 +1493,7 @@ function aHome(){
   const inc=siteIncome(),pend=Object.values(AD_.shops).filter(s=>s.status==='pending'),pays=AD_.pays.filter(p=>p.status==='pending'),reps=AD_.reports.filter(r=>r.status==='open');
   const owed=Object.values(AD_.shops).reduce((a,s)=>a+shopBalance(s).owed,0);
   const live=Object.values(D.ads).filter(adLive).length;
-  return`<div class="kpis"><div class="hi"><b>${money(inc.total)}</b>${L('دخل نيل +','NILE+ income')}</div><button class="kbtn" data-kdet="comm"><b>${money(inc.comm)}</b>${L('عمولات المتاجر','Shop commissions')}<small>${L('التفاصيل ‹','Details ›')}</small></button><div><b>${money(inc.fees)}</b>${L('رسوم التوصيل والدفع','Delivery & payment fees')}</div><button class="kbtn" data-kdet="ads"><b>${money(inc.ads)}</b>${L('رسوم إعلانات الأفراد','Individual ad fees')}<small>${L('التفاصيل ‹','Details ›')}</small></button>
+  return`<div class="kpis"><div class="hi"><b>${money(inc.total)}</b>${L('دخل نيل +','NILE+ income')}</div><button class="kbtn" data-kdet="comm"><b>${money(inc.comm)}</b>${L('عمولات المتاجر','Shop commissions')}<small>${L('التفاصيل ‹','Details ›')}</small></button><div><b>${money(inc.fees)}</b>${L('رسوم التوصيل والدفع','Delivery & payment fees')}</div><button class="kbtn" data-kdet="ads"><b>${money(inc.ads)}</b>${L('رسوم إعلانات الأفراد','Individual ad fees')}<small>${L('التفاصيل ‹','Details ›')}</small></button><button class="kbtn" data-atab="banners"><b>${money(inc.bnr)}</b>${L('البانرات الإعلانية','Advertising banners')}<small>${L('التفاصيل ‹','Details ›')}</small></button>
     <div><b>${money(inc.gmv)}</b>${L('قيمة الطلبات','Order value')}</div><div><b>${num(inc.n)}</b>${L('طلبات قائمة ومكتملة','Active & completed orders')}</div><button class="kbtn" data-kdet="owed"><b class="${owed?'redc':''}">${money(owed)}</b>${L('مستحق للمتاجر الحين','Owed to shops now')}<small>${L('التفاصيل ‹','Details ›')}</small></button>
     <div><b>${num(Object.values(AD_.shops).filter(s=>s.status==='approved').length)}</b>${L('متاجر معتمدة','Approved shops')}</div><div><b>${num(live)}</b>${L('إعلانات أفراد ظاهرة','Live individual ads')}</div><div><b>${num(AD_.users.length)}</b>${L('مستخدمين','Users')}</div></div>
    ${ordersSummary()}
@@ -1637,6 +1663,59 @@ function aReview(){
    ${l.length?l.map(card).join(''):`<div class="panel" style="text-align:center"><p class="muted">${L('ما فيه منشورات تنتظر.','Nothing waiting.')}</p></div>`}
    ${recent.length?`<h3 class="h3" style="margin-top:18px">${L('آخر ما اعتُمد (للمتابعة)','Recently approved (to keep an eye on)')}</h3><div class="tbl-wrap"><table class="adm">${recent.map(({k,x})=>`<tr><td>${k==='ad'?L('إعلان','Ad'):L('منتج','Product')}</td><td dir="auto"><a href="${k==='ad'?`index.html?ad=${x.id}`:`index.html?p=${x.id}`}" target="_blank" rel="noopener">${k==='ad'?esc(x.t):pname(x)}</a></td><td class="tn">${money(x.p)}</td><td>${ago(x.createdAt)}</td><td><button class="lnk redc" data-mod="${k}:${x.id}:reject">${L('ارفضه','Reject')}</button></td></tr>`).join('')}</table></div>`:''}`;
 }
+
+/* ───── advertising banners ───── */
+function formErr(f,m){let e=f.querySelector('p.err.fe');if(!e){e=document.createElement('p');e.className='err fe';e.setAttribute('role','alert');f.appendChild(e);}e.textContent=m;e.scrollIntoView({block:'center'});}
+// a link pasted from the site becomes an in-site link; anything else must be https
+function parseLink(v){
+  v=(v||'').trim();if(!v)return '';
+  try{const u=new URL(v);const q=u.searchParams;
+    if(/(^|\.)nileplus\.github\.io$/.test(u.hostname)||u.hostname===location.hostname){if(isUuid(q.get('p')))return 'p:'+q.get('p');if(isUuid(q.get('s')))return 's:'+q.get('s');if(isUuid(q.get('ad')))return 'ad:'+q.get('ad');}
+    return u.protocol==='https:'?u.href.slice(0,500):null;}catch(e){return null;}
+}
+const linkTxt=l=>{if(!l)return L('بدون رابط','No link');const [k,v]=l.split(/:(.+)/);if(k==='p'){const p=D.products[v];return L('منتج: ','Product: ')+(p?pname(p):'—');}
+  if(k==='s'){const x=store(v);return L('متجر: ','Shop: ')+(x?sname(x):'—');}if(k==='ad'){const a=D.ads[v];return L('إعلان: ','Ad: ')+(a?esc(a.t):'—');}return`<span dir="ltr">${esc(l.replace(/^https:\/\//,'').slice(0,40))}</span>`;};
+const bState=b=>!b.on?['st-cancelled',L('موقوف','Off')]:b.from>Date.now()?['st-placed',L('مجدول','Scheduled')]:b.to<=Date.now()?['st-cancelled',L('انتهى','Ended')]:['st-delivered',L('يعرض الحين','Running')];
+const dIn=t=>new Date(t-new Date(t).getTimezoneOffset()*6e4).toISOString().slice(0,10);
+function aBanners(){
+  const l=AD_.banners,run=l.filter(b=>bState(b)[1]===L('يعرض الحين','Running')),tot=l.reduce((a,b)=>a+b.price,0),cl=l.reduce((a,b)=>a+b.clicks,0);
+  return`<div class="kpis" style="margin-top:0"><div><b>${num(run.length)}</b>${L('يعرض الحين','Running now')}</div><div><b>${money(tot)}</b>${L('دخل البانرات','Banner income')}</div><div><b>${num(cl)}</b>${L('ضغطات','Clicks')}</div></div>
+  <form id="bnForm" class="panel keep" novalidate><h3 class="h3">${L('أضف بانر','Add a banner')}</h3>
+   <div class="form">
+    ${fld('bn_file',L('صورة البانر','Banner image'),`<input class="inp" id="bn_file" type="file" accept="image/jpeg,image/png,image/webp">`,true,L('الكبير فوق: مقاس ١٥٠٠×٥٠٠ تقريبًا. البانر بين الأقسام: ٨٠٠×٣٠٠. تحت ٣ ميجا.','Top banner: about 1500×500. Between sections: 800×300. Under 3 MB.'))}
+    ${fld('bn_place',L('المكان','Placement'),sel('bn_place',[['hero',L('الكبير أعلى الصفحة الرئيسية','Large, top of the home page')],['mid',L('بين أقسام الصفحة الرئيسية','Between home page sections')]],'hero'))}
+    ${fld('bn_by',L('المعلن (اسم الشركة)','Advertiser (company name)'),inp('bn_by','','maxlength="120"'))}
+    ${fld('bn_t',L('عنوان داخلي (للتعريف فقط)','Internal title (for you only)'),inp('bn_t','','maxlength="120"'))}
+    ${fld('bn_link',L('الرابط عند الضغط (اختياري)','Link when clicked (optional)'),inp('bn_link','','maxlength="500" dir="ltr" placeholder="https://nileplus.github.io/?p=..."'),true,L('انسخ رابط أي منتج أو متجر أو إعلان من الموقع والصقه هنا، أو رابط خارجي يبدأ بـ https://','Paste a product, shop or ad link copied from the site, or an outside link starting with https://'))}
+    ${fld('bn_from',L('يبدأ من','Starts'),inp('bn_from',dIn(Date.now()),'type="date"'))}
+    ${fld('bn_to',L('ينتهي في','Ends'),inp('bn_to',dIn(Date.now()+30*864e5),'type="date"'))}
+    ${fld('bn_price',L('المبلغ اللي دفعه المعلن (ر.ق)','Amount the advertiser paid (QAR)'),inp('bn_price','0','type="number" min="0" step="1"'),false,L('صفر لو البانر لعروضك أنت.','Zero if it’s your own promotion.'))}
+    ${fld('bn_sort',L('الترتيب','Order'),inp('bn_sort','0','type="number" step="1"'),false,L('الأصغر يطلع أول.','Lower shows first.'))}
+   </div><div style="margin-top:12px"><button class="btn red" style="width:auto" type="submit">${L('انشر البانر','Publish banner')}</button></div></form>
+  <section class="panel"><h3 class="h3">${L('البانرات','Banners')}</h3>
+   ${l.length?`<div class="tbl-wrap"><table class="adm"><tr><th>${L('البانر','Banner')}</th><th>${L('المعلن','Advertiser')}</th><th>${L('المكان','Placement')}</th><th>${L('الرابط','Link')}</th><th>${L('المدة','Period')}</th><th>${L('الحالة','Status')}</th><th>${L('ضغطات','Clicks')}</th><th>${L('المبلغ','Amount')}</th><th></th></tr>
+    ${l.map(b=>{const [c,t]=bState(b);return`<tr><td><a href="${IMG(b.img)}" target="_blank" rel="noopener"><img class="bthumb" src="${IMG(b.img)}" alt=""></a><div class="muted" style="font-size:12px">${esc(b.t)}</div></td><td>${esc(b.by||'—')}</td><td>${b.place==='hero'?L('أعلى الصفحة','Top'):L('بين الأقسام','Middle')}</td><td style="font-size:12.5px">${linkTxt(b.link)}</td>
+     <td style="font-size:12.5px">${fmtShort(new Date(b.from))} – ${fmtShort(new Date(b.to))}</td><td><span class="stp ${c}">${t}</span></td><td class="tn">${num(b.clicks)}</td><td class="tn">${money(b.price)}</td>
+     <td><div class="acts2"><button class="lnk" data-bnon="${b.id}">${b.on?L('أوقف','Turn off'):L('شغّل','Turn on')}</button><button class="lnk redc" data-bndel="${b.id}">${L('احذف','Delete')}</button></div></td></tr>`;}).join('')}</table></div>`
+    :`<p class="muted" style="margin:0">${L('ما فيه بانرات للحين. لما تضيف بانر كبير، يحل محل الصور اللي أعلى الصفحة الرئيسية.','No banners yet. Once you add a large banner it replaces the pictures at the top of the home page.')}</p>`}</section>`;
+}
+async function saveBanner(f){
+  const file=($('#bn_file').files||[])[0],link=parseLink($('#bn_link').value),from=new Date($('#bn_from').value+'T00:00:00'),to=new Date($('#bn_to').value+'T23:59:59');
+  if(!file)return formErr(f,L('اختر صورة البانر.','Choose the banner image.'));
+  if(!/^image\/(jpeg|png|webp)$/.test(file.type))return formErr(f,L('الصورة لازم تكون JPG أو PNG أو WEBP.','The image must be JPG, PNG or WEBP.'));
+  if(file.size>3*1024*1024)return formErr(f,L('الصورة أكبر من ٣ ميجا.','The image is over 3 MB.'));
+  if(link===null)return formErr(f,L('الرابط لازم يكون من الموقع أو يبدأ بـ https://','The link must be from the site or start with https://'));
+  if(!(to>from))return formErr(f,L('تاريخ النهاية لازم يكون بعد البداية.','The end date must be after the start.'));
+  const b=f.querySelector('[type=submit]');b.disabled=true;
+  try{
+    const path=`${ME.uid}/${crypto.randomUUID()}.${file.type.split('/')[1].replace('jpeg','jpg')}`;
+    const up=await ME.sb.storage.from('photos').upload(path,file,{contentType:file.type,cacheControl:'31536000'});if(up.error)throw up.error;
+    const r=await ME.sb.from('banners').insert({image:path,placement:$('#bn_place').value,advertiser:$('#bn_by').value.trim(),title:$('#bn_t').value.trim(),link,starts_at:from.toISOString(),ends_at:to.toISOString(),
+      price:Math.max(0,Number($('#bn_price').value)||0),sort:Math.round(Number($('#bn_sort').value)||0)});
+    if(r.error)throw r.error;
+    S.dirty=false;toast(L('انتشر البانر','Banner published'));aLoad();
+  }catch(e){b.disabled=false;formErr(f,dbErr(e));}
+}
 /* ───── shell ───── */
 function render(){
   const v=$('#view');document.documentElement.dir=S.ar?'rtl':'ltr';document.documentElement.lang=S.ar?'ar':'en';
@@ -1652,8 +1731,8 @@ function render(){
     <p class="muted" style="font-size:12.5px">${L('مسجّل باسم','Signed in as')} <span dir="ltr">${esc(ME.email)}</span> · <button class="lnk" data-aact="signout">${L('خروج','Sign out')}</button></p></section></div>`;return;}
   const pend=Object.values(AD_.shops).filter(s=>s.status==='pending').length,pays=AD_.pays.filter(p=>p.status==='pending').length,reps=AD_.reports.filter(r=>r.status==='open').length;
   const tabs=[['home',L('نظرة عامة','Overview')],['apps',L('طلبات الشركات','Company requests')+(pend?` (${num(pend)})`:'')],['shops',L('المتاجر والتحويلات','Shops & transfers')],['review',L('المراجعة','Review')+(revN()?` (${num(revN())})`:'')],['ads',L('إعلانات الأفراد','Individual ads')+(pays?` (${num(pays)})`:'')],
-    ['orders',L('الطلبات','Orders')],['products',L('المنتجات','Products')],['reports',L('البلاغات','Reports')+(reps?` (${num(reps)})`:'')],['users',L('المستخدمين','Users')],['settings',L('الإعدادات','Settings')]];
-  const body=AS.detail?{ads:aDetAds,comm:aDetComm,owed:aDetOwed}[AS.detail]:{home:aHome,review:aReview,apps:aApps,shops:aShops,ads:aAds,orders:aOrders,products:aProducts,reports:aReports,users:aUsers,settings:aSettings}[AS.tab]||aHome;
+    ['orders',L('الطلبات','Orders')],['products',L('المنتجات','Products')],['banners',L('البانرات','Banners')],['reports',L('البلاغات','Reports')+(reps?` (${num(reps)})`:'')],['users',L('المستخدمين','Users')],['settings',L('الإعدادات','Settings')]];
+  const body=AS.detail?{ads:aDetAds,comm:aDetComm,owed:aDetOwed}[AS.detail]:{home:aHome,banners:aBanners,review:aReview,apps:aApps,shops:aShops,ads:aAds,orders:aOrders,products:aProducts,reports:aReports,users:aUsers,settings:aSettings}[AS.tab]||aHome;
   v.innerHTML=`<div class="wrap"><section style="margin-top:16px"><div class="orow"><h2 style="font-size:24px;margin:0">${L('لوحة تحكم نيل +','NILE+ dashboard')}</h2><span class="muted" style="font-size:13px"><span dir="ltr">${esc(ME.email)}</span> · <button class="lnk" data-aact="reload">↻ ${L('تحديث','Refresh')}</button> · <button class="lnk" data-aact="signout">${L('خروج','Sign out')}</button></span></div>
    <div class="tabs" style="margin:12px 0 14px">${tabs.map(([k,l])=>`<button data-atab="${k}" aria-selected="${AS.tab===k}">${l}</button>`).join('')}</div>
    ${AD_.loaded?body():`<p class="muted">${L('جاري التحميل…','Loading…')}</p>`}</section></div>`;
@@ -1668,6 +1747,8 @@ document.addEventListener('click',e=>{
   if(el=g('[data-kdet]')){AS.detail=el.dataset.kdet;if(!AS.detail)AS.tab='home';render();scrollTo({top:0});return;}
   if(el=g('[data-mod]')){const [k,id,d]=el.dataset.mod.split(':'),n=($('#mn_'+id)||{}).value||'';if(d==='reject'&&!n.trim())return toast(L('اكتب سبب الرفض.','Enter the reason.'),true);
     return act(()=>rpc('admin_moderate',{p_kind:k,p_id:id,p_decision:d,p_note:n.trim()}),{approve:L('اعتمدته، وبيظهر للعملاء','Approved; customers will see it'),reject:L('رفضته، والسبب وصل لصاحبه','Rejected; the owner sees the reason'),recheck:L('رجع للفحص الآلي','Sent back for automatic review')}[d]);}
+  if(el=g('[data-bnon]')){const b=AD_.banners.find(x=>x.id===el.dataset.bnon);return act(async()=>{const r=await ME.sb.from('banners').update({active:!b.on}).eq('id',b.id);if(r.error)throw r.error;},b.on?L('انوقف البانر','Banner turned off'):L('اشتغل البانر','Banner turned on'));}
+  if(el=g('[data-bndel]')){const id=el.dataset.bndel;return aModal(L('حذف البانر؟','Delete this banner?'),`<p class="muted">${L('ينشال من الموقع وتنحذف أرقامه.','It comes off the site and its numbers are deleted.')}</p>`,L('احذف','Delete'),async()=>{const r=await ME.sb.from('banners').delete().eq('id',id);if(r.error)throw r.error;});}
   if(el=g('[data-aikey]')){const v=el.dataset.aikey==='clear'?'':$('#ai_key').value.trim();if(el.dataset.aikey!=='clear'&&!/^sk-ant-/.test(v))return toast(L('المفتاح يبدأ بـ sk-ant-','The key starts with sk-ant-'),true);
     return act(()=>rpc('admin_set_ai_key',{p_key:v}),v?L('انحفظ المفتاح، والمراجعة الآلية بدأت','Key saved; automatic review started'):L('انشال المفتاح','Key removed'));}
   if(el=g('[data-aordf]')){AS.ordF=el.dataset.aordf;render();return;}
@@ -1710,6 +1791,7 @@ document.addEventListener('submit',async e=>{
   e.preventDefault();const f=e.target;
   if(f.id==='loginForm'){const {error}=await ME.sb.auth.signInWithPassword({email:$('#lg_email').value.trim(),password:$('#lg_pw').value});if(error){const x=$('#lgerr');x.textContent=L('البريد أو كلمة المرور غير صحيحة.','Wrong email or password.');x.hidden=false;}return;}
   if(f.id==='claimForm'){try{await rpc('claim_admin',{p_code:$('#cl_code').value.trim().toUpperCase()});ME.owner=true;toast(L('صار حسابك مالك لوحة التحكم','This account now owns the dashboard'));aLoad();}catch(x){const m=$('#clerr');m.textContent=dbErr(x);m.hidden=false;}return;}
+  if(f.id==='bnForm')return saveBanner(f);
   if(f.id==='setForm'){const n=id=>Number($('#'+id).value);
     const row={review_minutes:Math.round(n('st_review')),comm:n('st_comm'),ad_fee:n('st_adfee'),ad_days:Math.round(n('st_addays')),free_over:n('st_free'),fee_std:n('st_std'),fee_next:n('st_next'),fee_same:n('st_same'),fee_cod:n('st_cod'),fee_gift:n('st_gift'),pay_info:$('#st_payinfo').value.trim().slice(0,1000),updated_at:new Date().toISOString()};
     if(Object.entries(row).some(([k,v])=>typeof v==='number'&&!(v>=0)))return toast(L('تأكد من الأرقام.','Check the numbers.'),true);

@@ -38,7 +38,7 @@ const S={ar:true,view:'home',cat:'all',q:'',fav:false,slide:0,sort:'feat',minR:0
   adCat:'all',adQ:'',adId:null,joinAs:''};
 // what the database holds, as this viewer sees it
 const D={stores:{},products:{},reviews:{},questions:{},follows:{},mod:{},reports:{},settings:{...DEF},myOrders:{},sellOrders:{},allOrders:{},thrB:{},thrS:{},
-  ads:{},adPays:[],payouts:[],loaded:{stores:false,products:false}};
+  ads:{},adPays:[],payouts:[],banners:[],loaded:{stores:false,products:false}};
 // who is viewing and what they may do
 const ME={uid:null,owner:false,write:null,sb:null,email:'',name:'',banned:false,ready:false,live:false,offline:false,chan:null,
   doc:{cart:[],wish:[],addrs:[],recent:[],cpns:[],follows:[],seen:{},costs:{},phone:''}};
@@ -176,10 +176,11 @@ function intoMap(map,list){Object.keys(map).forEach(k=>delete map[k]);list.forEa
 async function loadCatalog(){
   const sb=ME.sb;
   try{
-    const [st,sh,pr,rv,qs,an,fo,ads]=await Promise.all([
+    const [st,sh,pr,rv,qs,an,fo,ads,bn]=await Promise.all([
       q(sb.from('settings').select('*').eq('id',1)),q(sb.from('shops').select('*').limit(1000)),q(sb.from('products').select('*').order('created_at',{ascending:false}).limit(1000)),
       q(sb.from('reviews').select('*').limit(1000)),q(sb.from('questions').select('*').order('created_at',{ascending:false}).limit(1000)),q(sb.from('answers').select('*').order('created_at').limit(3000)),
-      q(sb.from('follows').select('shop_id,user_id').limit(5000)),q(sb.from('ads').select('*').order('created_at',{ascending:false}).limit(500))]);
+      q(sb.from('follows').select('shop_id,user_id').limit(5000)),q(sb.from('ads').select('*').order('created_at',{ascending:false}).limit(500)),
+      q(sb.from('banners').select('id,title,advertiser,image,link,placement,starts_at,ends_at,active,sort').order('sort').order('created_at',{ascending:false}).limit(50))]);
     const s=st[0]||{};
     D.settings={freeOver:nn(s.free_over,0,1e4),std:nn(s.fee_std,0,1e4),next:nn(s.fee_next,0,1e4),same:nn(s.fee_same,0,1e4),cod:nn(s.fee_cod,0,1e4),gift:nn(s.fee_gift,0,1e4),
       comm:nn(s.comm,0,50),adFee:nn(s.ad_fee,0,1e4),adDays:Math.floor(nn(s.ad_days,1,365)),payInfo:str(s.pay_info,1000),termsV:s.terms_version||1,reviewMin:Math.floor(nn(s.review_minutes,0,1440))};
@@ -192,6 +193,7 @@ async function loadCatalog(){
     intoMap(D.questions,qs.map(x=>({id:x.id,pid:x.product_id,s:x.shop_id,by:x.user_id,q:str(x.body,600),at:ts(x.created_at),ans:byQ[x.id]||[]})));
     intoMap(D.follows,fo.map(f=>({id:f.shop_id+'_'+f.user_id,s:f.shop_id,by:f.user_id})));
     intoMap(D.ads,ads.map(normA));
+    D.banners=bn.filter(b=>okAsset(b.image)).map(b=>({id:b.id,t:str(b.title,120),by:str(b.advertiser,120),img:b.image,link:str(b.link,500),place:b.placement==='mid'?'mid':'hero',from:ts(b.starts_at),to:ts(b.ends_at),on:!!b.active}));
     D.loaded.stores=D.loaded.products=true;ME.live=true;
   }catch(e){console.warn('[NILE+] catalog',e);ME.offline=true;}
   schedule();
@@ -481,7 +483,7 @@ function emptyMarket(){
 }
 function vHome(){
   const ps=allProds();
-  if(!ps.length)return heroHTML()+emptyMarket()+`<div class="wrap">${adsRail()}</div>`;
+  if(!ps.length)return heroHTML()+`<div class="wrap">${midBanners()}</div>`+emptyMarket()+`<div class="wrap">${adsRail()}</div>`;
   const byCat=k=>ps.filter(p=>p.c===k).sort((a,b)=>b.sold-a.sold);
   const top=[...ps].sort((a,b)=>(b.sold-a.sold)||(b.createdAt-a.createdAt));
   const stores=Object.values(D.stores).filter(s=>storeLive(s)&&storeProds(s.id).length).sort((a,b)=>(storeRating(b.id).n-storeRating(a.id).n)||(storeProds(b.id).length-storeProds(a.id).length));
@@ -502,6 +504,7 @@ function vHome(){
      if(t==='s'){const s=store(k);return`<button class="qi" data-store="${k}"><div class="im">${logo(s,56)}</div><span>${sname(s)}</span></button>`;}
      const p=prod(k);return`<button class="qi" data-open="${k}"><div class="im">${pimg(p)}</div><span class="clamp2">${tx(p.sub[0]||p.sub[1]?p.sub:[cname(p.c),cname(p.c)])}</span></button>`;}).join('')}</div>
      <button class="lnk more" data-act="${a}">${more}</button></div>`).join('')}</section>
+   ${midBanners()}
    ${recent.length?`<section class="panel"><div class="ph"><h2>${L('شاهدتها مؤخرًا','Your browsing history')}</h2></div><div class="rail">${recent.map(railItem).join('')}</div></section>`:''}
    ${deals.length?`<section class="panel" id="dealsP"><div class="ph"><h2>${L('عروض اليوم','Today’s Deals')}</h2><button class="lnk" data-act="dealsAll">${L('شاهد كل العروض','See all deals')}</button></div>
      <div class="rail">${deals.map(p=>`<button class="deal" data-open="${p.id}"><div class="im">${pimg(p)}</div><div class="tags"><span class="off">${L('خصم','-')} ${num(pct(p))}٪</span><span class="lim">${L('عرض','Deal')}</span></div>${priceHTML(p)}<div class="clamp2" style="font-size:13px">${pname(p)}</div></button>`).join('')}</div></section>`:''}
@@ -511,7 +514,29 @@ function vHome(){
    <section class="panel"><div class="ph"><h2>${L('اخترناها لك','Picked for you')}</h2></div><div class="grid">${top.slice(0,40).map(card).join('')}</div></section>
    </div>`;
 }
+/* ───────── advertising banners (run by NILE+ from the dashboard) ───────── */
+const runningBanners=place=>D.banners.filter(b=>b.on&&b.place===place&&b.from<=Date.now()&&b.to>Date.now());
+const bannerImg=(b,eager)=>`<img src="${IMG(b.img)}" alt="${esc(b.t||b.by||L('إعلان','Advertisement'))}" ${eager?'':'loading="lazy"'} decoding="async">`;
+function bannerHero(B){
+  S.slide%=B.length;
+  return`<section class="hero bhero" aria-label="${L('إعلانات','Advertisements')}">${B.map((b,i)=>`<button class="slide" aria-hidden="${i!==S.slide}" data-banner="${b.id}">${bannerImg(b,i===0)}<span class="adtag">${L('إعلان','Ad')}</span></button>`).join('')}
+   ${B.length>1?`<button class="arrow prev" data-act="prev" aria-label="${L('السابق','previous')}">‹</button><button class="arrow next" data-act="next" aria-label="${L('التالي','next')}">›</button>
+   <div class="dots">${B.map((b,i)=>`<i class="${i===S.slide?'on':''}"></i>`).join('')}</div>`:''}</section>`;
+}
+function midBanners(){
+  const B=runningBanners('mid').slice(0,2);
+  return B.length?`<section class="mbanners n${B.length}">${B.map(b=>`<button class="mbn" data-banner="${b.id}">${bannerImg(b)}<span class="adtag">${L('إعلان','Ad')}</span></button>`).join('')}</section>`:'';
+}
+function openBanner(id){
+  const b=D.banners.find(x=>x.id===id);if(!b)return;
+  if(ME.sb)ME.sb.rpc('banner_click',{p_id:id}).then(()=>{},()=>{});
+  const [k,v]=b.link.split(/:(.+)/);
+  if(k==='p'&&isUuid(v))go('product',{pid:v,img:0});else if(k==='s'&&isUuid(v))go('store',{sid:v,stab:'home'});else if(k==='ad'&&isUuid(v))go('ad',{adId:v,img:0});
+  else if(/^https:\/\//.test(b.link))window.open(b.link,'_blank','noopener');
+}
 function heroHTML(){
+  const B=runningBanners('hero');if(B.length)return bannerHero(B);
+
   const SL=[['s1',L('عروض الموسم','Season deals'),L('خصومات على الإلكترونيات','Deals on electronics'),L('سماعات، مكبرات صوت وأجهزة ذكية','Headphones, speakers and smart devices'),'🎧','c:electronics'],
    ['s2',L('المتاجر','Stores'),L('تسوّق من متاجر قطرية','Shop Qatari stores'),L('كل متجر له صفحة وتقييمات حقيقية من المشترين','Every store has its own page and real buyer reviews'),'🏬','stores'],
    ['s3',L('المنزل','Home'),L('جدّد بيتك بأسعار أقل','Refresh your home for less'),L('إضاءة، أكواب وأدوات يومية','Lighting, cups and everyday essentials'),'🛋️','c:home']];
@@ -1898,6 +1923,7 @@ document.addEventListener('click',e=>{
   // seller center
   if(el=g('[data-stab2]')){S.sellTab=el.dataset.stab2;if(el.dataset.of)S.ordF=el.dataset.of;render(true);return;}
   if(el=g('[data-mper]')){S.mPer=el.dataset.mper;render(true);return;}
+  if(el=g('[data-banner]')){openBanner(el.dataset.banner);return;}
   if(el=g('[data-adopen]')){go('ad',{adId:el.dataset.adopen,img:0});return;}
   if(el=g('[data-adcat]')){go('ads',{adCat:el.dataset.adcat});return;}
   if(el=g('[data-adchat]')){openAdChat(el.dataset.adchat);return;}
@@ -1945,7 +1971,7 @@ document.addEventListener('click',e=>{
       confirmOk:async()=>{const fn=PEND;if(!fn)return;const err=await fn();if(err)toast(err,true);else{hide();render(true);}},
       toReviews:()=>scrollTo2('#revS'),toQA:()=>scrollTo2('#qaS'),toOffers:()=>scrollTo2('#offersS'),
       lang:()=>{S.ar=!S.ar;LS.set('nileplus.lang',S.ar?'ar':'en');hide();render(true);},top:()=>scrollTo({top:0,behavior:'smooth'}),
-      prev:()=>{S.slide=(S.slide+2)%3;render(true);},next:()=>{S.slide=(S.slide+1)%3;render(true);}};
+      prev:()=>{const n=document.querySelectorAll('.hero .slide').length||3;S.slide=(S.slide+n-1)%n;render(true);},next:()=>{const n=document.querySelectorAll('.hero .slide').length||3;S.slide=(S.slide+1)%n;render(true);}};
     A[a]?.();}
 });
 document.addEventListener('change',e=>{
@@ -1989,6 +2015,8 @@ document.addEventListener('keydown',e=>{
 document.addEventListener('focusout',()=>setTimeout(()=>{if(softPending&&!typing())render(true);},0));
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&S.view==='thread')markThreadSeen();});
 $('#lang').onclick=()=>{S.ar=!S.ar;LS.set('nileplus.lang',S.ar?'ar':'en');render(true);};
-if(!matchMedia('(prefers-reduced-motion: reduce)').matches)setInterval(()=>{if(S.view!=='home'||document.hidden||!$('#sheet').hidden)return;S.slide=(S.slide+1)%3;document.querySelectorAll('.slide').forEach((s,i)=>s.setAttribute('aria-hidden',i!==S.slide));document.querySelectorAll('.arrow').forEach(a=>a.style.color=S.slide===2?'#111':'#fff');},6000);
+if(!matchMedia('(prefers-reduced-motion: reduce)').matches)setInterval(()=>{if(S.view!=='home'||document.hidden||!$('#sheet').hidden)return;const sl=document.querySelectorAll('.hero .slide');if(sl.length<2)return;
+  S.slide=(S.slide+1)%sl.length;sl.forEach((x,i)=>x.setAttribute('aria-hidden',i!==S.slide));document.querySelectorAll('.hero .dots i').forEach((d,i)=>d.classList.toggle('on',i===S.slide));
+  if(!document.querySelector('.bhero'))document.querySelectorAll('.arrow').forEach(a=>a.style.color=S.slide===2?'#111':'#fff');},6000);
 if(LS.get('nileplus.lang')==='en')S.ar=false;
 boot();
