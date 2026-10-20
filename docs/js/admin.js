@@ -19,7 +19,7 @@ const CITIES=[
 const DEF={freeOver:100,std:10,next:15,same:25,cod:10,gift:10,comm:10,adFee:15,adDays:30,payInfo:'',termsV:1};
 const ADCATS={...Object.fromEntries(Object.entries(CATS).filter(([k])=>k!=='all')),other:['أخرى','Other','🏷️']};
 const PALETTE=['#d7141e','#0c0c0c','#3a3a3a','#a80f17','#1f4e79','#0a7a33','#7a4a2a','#5b2a86'];
-const EMOJIS=['🎧','🔊','⌚','📱','💻','📷','🎮','👟','🎒','👜','👗','🕶️','💍','💡','🛋️','☕','🍳','🧴','✨','💄','🏋️','🥤','⚽','🚲','🧸','📚','🎁','📦'];
+const EMOJIS=['🎧','🔊','⌚','📱','💻','📷','🎮','👟','🎒','👜','👗','🕶️','💍','💡','🛋️','☕','🍳','🧴','✨','💄','🏋️','🥤','⚽','🚲','🧸','📚','🎁','🔌','👕','🧹','🛏️','🪑','❄️','🧊','📦'];
 const CARRIERS=[['nile','نيل + للتوصيل','NILE+ Delivery'],['qpost','بريد قطر','Qatar Post'],['aramex','أرامكس','Aramex'],['dhl','دي إتش إل','DHL'],['snoonu','سنونو','Snoonu'],['own','مندوب المتجر','Store’s own driver']];
 const RESP=[['1h','خلال ساعة','within 1 hour'],['3h','خلال ٣ ساعات','within 3 hours'],['day','خلال يوم','within a day']];
 const RETS=[7,14,15,30];
@@ -90,7 +90,7 @@ function normS(r){
     e:EMOJIS.includes(r.emoji)||r.emoji==='🏬'?r.emoji:'🏬',d:[str(r.about_ar,600),str(r.about_en,600)],city:cityOf(r.city).k,ret:RETS.includes(r.ret_days)?r.ret_days:14,
     resp:RESP.some(x=>x[0]===r.resp)?r.resp:'3h',since:new Date(ts(r.created_at)||Date.now()).getFullYear(),cr:str(r.cr_number,30),activity:str(r.activity,120),
     phone:str(r.public_phone,20),status:['pending','approved','rejected','suspended'].includes(r.status)?r.status:'pending',note:str(r.status_note,500),
-    comm:nn(r.commission,0,50),ver:!!r.verified,ful:!!r.fulfilled,sample:false,createdAt:ts(r.created_at)};
+    comm:nn(r.commission,0,50),ver:!!r.verified,ful:!!r.fulfilled,sample:!!r.demo,createdAt:ts(r.created_at)};
 }
 function normP(r){
   if(!r)return null;
@@ -124,7 +124,7 @@ const normR=r=>({id:r.id,pid:r.product_id,s:r.shop_id,by:r.user_id,r:Math.round(
   hv:Array.isArray(r.helpful)?r.helpful:[],reply:str(r.reply,1500),at:ts(r.updated_at||r.created_at)});
 const normA=r=>({id:r.id,uid:r.user_id,c:r.category,t:str(r.title,120),d:str(r.description,3000),p:nn(r.price,0,1e7),cond:r.condition==='new'?'new':'used',city:cityOf(r.city).k,
   phone:str(r.contact_phone,16),showPhone:!!r.show_phone,e:EMOJIS.includes(r.emoji)?r.emoji:'📦',imgs:Array.isArray(r.images)?r.images.filter(okAsset).slice(0,8):[],
-  status:r.status,note:str(r.status_note,500),until:ts(r.paid_until),mod:['pending','approved','flagged','rejected'].includes(r.mod_status)?r.mod_status:'pending',modWhy:Array.isArray(r.mod_reasons)?r.mod_reasons.filter(x=>typeof x==='string').slice(0,6).map(x=>x.slice(0,300)):[],releaseAt:ts(r.release_at),createdAt:ts(r.created_at)});
+  status:r.status,note:str(r.status_note,500),until:ts(r.paid_until),mod:['pending','approved','flagged','rejected'].includes(r.mod_status)?r.mod_status:'pending',modWhy:Array.isArray(r.mod_reasons)?r.mod_reasons.filter(x=>typeof x==='string').slice(0,6).map(x=>x.slice(0,300)):[],releaseAt:ts(r.release_at),demo:!!r.demo,createdAt:ts(r.created_at)});
 // customers see an ad once it's paid, passed review and its holding time is over
 const adLive=a=>!!a&&a.status==='live'&&a.until>Date.now()&&a.mod==='approved'&&a.releaseAt<=Date.now();
 
@@ -327,7 +327,7 @@ function dbErr(e){
     pending_exists:L('عندك طلب ينتظر المراجعة.','You already have a request waiting for review.'),cr_file:L('ارفع صورة أو ملف السجل التجاري.','Upload the commercial registration file.'),
     not_delivered:L('تقدر تقيّم بعد ما يوصلك الطلب.','You can review once your order is delivered.'),own:L('هذا إعلانك أو متجرك.','This is your own ad or shop.'),
     already_set:L('لوحة التحكم لها مالك مسبقًا.','The dashboard already has an owner.'),bad_code:L('رمز الإعداد غير صحيح.','The setup code is wrong.'),
-    sign_in:L('سجّل دخولك أول.','Sign in first.'),state:L('حالته تغيّرت. شوف آخر تحديث.','Its status has changed. See the latest update.'),gone:L('ما عاد موجود.','It no longer exists.')};
+    sign_in:L('سجّل دخولك أول.','Sign in first.'),demo:L('هذا متجر أو إعلان تجريبي للعرض فقط، ما يستقبل طلبات ولا رسائل.','This is a sample shop or ad for display only. It takes no orders or messages.'),state:L('حالته تغيّرت. شوف آخر تحديث.','Its status has changed. See the latest update.'),gone:L('ما عاد موجود.','It no longer exists.')};
   const k=m.split(':')[0];
   if(k==='stock'){const [,n,t]=m.split(':');return L(`الكمية المتوفرة من «${t}» صارت ${num(n)}. عدّل الكمية في السلة.`,`Only ${n} of “${t}” left now. Change the quantity in your cart.`);}
   if(k==='gone'&&m.split(':')[1])return L(`«${m.split(':')[1]}» ما عاد متاح. احذفه من السلة.`,`“${m.split(':')[1]}” is no longer available. Remove it from your cart.`);
@@ -358,6 +358,7 @@ const subtotal=()=>cartLines().reduce((s,c)=>{const p=lineP(c);return s+(p&&visi
 const couponTotal=()=>cartLines().reduce((s,c)=>{const p=lineP(c);return s+(p&&visible(p)&&p.cpn&&ME.doc.cpns.includes(p.id)?p.cpn*c.q:0);},0);
 function addItem(pid,q=1,v){
   const p=prod(pid);if(!p||!visible(p))return false;
+  if((store(p.s)||{}).sample){toast(dbErr({message:'demo'}),true);return false;}
   v=v??(S.vsel[pid]??0);
   if(p.stock<1){toast(L('نفدت الكمية','Out of stock'),true);return false;}
   const c=ME.doc.cart.find(x=>x.pid===pid&&x.v===v);
@@ -385,6 +386,10 @@ const priceHTML=p=>`<div class="price"><span class="whole">${num(p.p)}</span><sp
 const nbadge=`<span class="badge-n">NILE<i>+</i></span>`;
 const logo=(s,size=44)=>s?`<span class="slogo" style="width:${size}px;height:${size}px;background:${s.bg};font-size:${Math.round(size*.45)}px">${esc((s.lg[S.ar?0:1]||s.lg[0]||(s.ar||s.en||'+')).slice(0,2))}</span>`:'';
 const vbadge=()=>`<span class="vbadge">✔ ${L('بائع موثّق','Verified seller')}</span>`;
+// the small “personal” mark on every ad posted by an individual
+const pBadge=(cls='')=>`<img class="pbadge ${cls}" src="img/personal.png" alt="${L('إعلان شخصي','Personal ad')}" width="200" height="129" loading="lazy">`;
+// the small "sample" tag on demo shops and ads
+const demoTag=x=>x&&(x.demo||x.sample)?`<span class="spl">${L('تجريبي','Sample')}</span>`:'';
 const samplePill=s=>s&&s.sample?`<span class="spl">${L('متجر تجريبي','Sample store')}</span>`:'';
 function pimg(p,i=0,big){
   const id=p&&p.imgs&&p.imgs[i];
@@ -403,7 +408,7 @@ function card(p){const st=store(p.s),dl=delivery(p),fav=ME.doc.wish.includes(p.i
    <button class="fav" data-fav="${p.id}" aria-pressed="${fav}" aria-label="${L('قائمة الأمنيات','Wish list')}">${heart(fav)}</button>
    <div class="bd">
      <button class="nm clamp2" data-open="${p.id}">${pname(p)}</button>
-     <div class="by muted">${L('من','by')} <button class="lnk" data-store="${p.s}">${sname(st)}</button></div>
+     <div class="by muted">${L('من','by')} <button class="lnk" data-store="${p.s}">${sname(st)}</button> ${demoTag(st)}</div>
      ${rateRow(p.id)}
      ${p.sold?`<div class="bought">${soldTxt(p.sold)}</div>`:''}
      ${p.o?`<div class="tags"><span class="off">${L('خصم','-')} ${num(pct(p))}٪</span><span class="lim">${L('عرض','Deal')}</span></div>`:''}
@@ -643,7 +648,8 @@ function vProduct(){
       ${dl.same.ok?`<div class="dl">${L('أو <b>توصيل اليوم</b>','Or <b>same-day delivery</b>')} ${L('بـ','for')} ${money(stt.same)}. ${L('اطلب خلال','Order within')} <b class="okc">${cutoff()}</b></div>`:dl.next.ok?`<div class="dl">${L('أو أسرع توصيل <b>غدًا</b>','Or fastest delivery <b>tomorrow</b>')} ${fmtShort(dl.next.d)} ${L('بـ','for')} ${money(stt.next)}. ${L('اطلب خلال','Order within')} <b class="okc">${cutoff()}</b></div>`:''}`}
       <button class="lnk loc" data-act="city">📍 ${L(`التوصيل إلى ${cityName(c)}، قطر — تغيير`,`Deliver to ${cityName(c)}, Qatar — change`)}</button>
       <div class="stk ${out||low?'redc':'okc'}">${out?L('نفدت الكمية حاليًا','Currently out of stock'):low?L(`باقي ${num(p.stock)} فقط - اطلب قريبًا`,`Only ${p.stock} left in stock - order soon`):L('متوفر','In stock')}</div>
-      ${out?'':`<label>${L('الكمية:','Qty:')} <select id="pq">${Array.from({length:qMax},(_,i)=>`<option value="${i+1}" ${S.qty===i+1?'selected':''}>${num(i+1)}</option>`).join('')}</select></label>
+      ${st&&st.sample?`<div class="note" style="margin:0">${demoTag(st)} ${L('متجر تجريبي للعرض فقط، ما يستقبل طلبات.','A sample store for display only. It takes no orders.')}</div>`:''}
+      ${out||(st&&st.sample)?'':`<label>${L('الكمية:','Qty:')} <select id="pq">${Array.from({length:qMax},(_,i)=>`<option value="${i+1}" ${S.qty===i+1?'selected':''}>${num(i+1)}</option>`).join('')}</select></label>
       <button class="btn red" data-addq="${p.id}">${L('أضف إلى السلة','Add to cart')}</button>
       <button class="btn blk" data-buy="${p.id}">${L('اشترِ الآن','Buy now')}</button>`}
       <dl class="kv">
@@ -1018,6 +1024,7 @@ async function openAdChat(aid){
   if(!guard())return;
   const a=D.ads[aid];if(!a)return;
   if(a.uid===ME.uid){toast(L('هذا إعلانك.','This is your ad.'),true);return;}
+  if(a.demo){toast(dbErr({message:'demo'}),true);return;}
   try{const tid=await rpc('open_thread',{p_shop:null,p_ad:aid,p_product:null});await loadMine();go('thread',{tid,draft:''});}
   catch(e){toast(dbErr(e),true);}
 }
@@ -1464,6 +1471,26 @@ const userOf=id=>AD_.users.find(u=>u.id===id)||{};
 const uname=id=>{const u=userOf(id);return `<span>${esc(u.full_name||'—')}</span>${u.email?`<div class="muted" style="font-size:12px" dir="ltr">${esc(u.email)}</div>`:''}`;};
 const shopStatus=s=>`<span class="stp ${{pending:'st-placed',approved:'st-delivered',rejected:'st-cancelled',suspended:'st-return_req'}[s.status]}">${{pending:L('قيد المراجعة','Pending'),approved:L('معتمد','Approved'),rejected:L('مرفوض','Rejected'),suspended:L('موقوف','Suspended')}[s.status]}</span>`;
 
+/* ───── sample data and new orders ───── */
+const demoCount=()=>({shops:Object.values(AD_.shops).filter(s=>s.sample).length,ads:Object.values(D.ads).filter(a=>a.demo).length,orders:Object.values(AD_.orders).filter(o=>(store(o.s)||{}).sample).length});
+function demoNote(){
+  const c=demoCount();if(!c.shops&&!c.ads)return'';
+  return`<div class="note demo-note"><div style="flex:1;min-width:220px"><b>${L('فيه بيانات تجريبية في الموقع','There is sample data on the site')}</b> ${demoTag({demo:1})}
+    <div class="muted" style="font-size:12.5px">${L(`${num(c.shops)} متاجر، ${num(c.orders)} طلب، ${num(c.ads)} إعلان أفراد، عشان تشوف كيف تشتغل اللوحة. عليها علامة «تجريبي» وما تستقبل طلبات ولا رسائل من العملاء. احذفها قبل الإطلاق.`,`${c.shops} shops, ${c.orders} orders and ${c.ads} individual ads so you can see how the dashboard works. They’re marked “Sample” and take no orders or messages. Delete them before launch.`)}</div></div>
+   <button class="btn out" style="width:auto" data-aact="cleardemo">🗑 ${L('احذف البيانات التجريبية','Delete sample data')}</button></div>`;
+}
+const newOrders=()=>Object.values(AD_.orders).filter(o=>o.status==='placed').sort((a,b)=>b.createdAt-a.createdAt);
+const accBtns=o=>`<div class="acts2"><button class="btn red" style="width:auto;height:32px;font-size:13px" data-oacc="${o.id}">✓ ${L('اقبل','Accept')}</button><button class="btn out" style="width:auto;height:32px;font-size:13px" data-orej="${o.id}">✖ ${L('ارفض','Reject')}</button></div>`;
+function newOrdersPanel(){
+  const l=newOrders();if(!l.length)return'';
+  return`<section class="panel"><div class="orow"><h3 class="h3" style="margin:0">🛎 ${L('طلبات جديدة تنتظر قبولك','New orders waiting for you')} <span class="cnt">${num(l.length)}</span></h3>${l.length>8?`<button class="lnk" data-aordgo="new">${L('كلها','See all')}</button>`:''}</div>
+   <p class="muted" style="font-size:12.5px;margin:4px 0 8px">${L('«اقبل» يأكد الطلب ويبدأ تجهيزه. «ارفض» يلغيه ويرجع المخزون، والسبب يوصل للعميل.','“Accept” confirms the order so it gets prepared. “Reject” cancels it, puts the stock back and tells the customer why.')}</p>
+   ${l.slice(0,8).map(o=>`<div class="payrow"><div style="flex:1;min-width:200px"><b class="tn" dir="ltr">${esc(o.no)}</b> <span class="muted" style="font-size:12px">· ${ago(o.createdAt)}</span>
+     <div style="font-size:13px">${sname(store(o.s))} ${demoTag(store(o.s))}</div><div style="font-size:12.5px">${itemsTxt(o)}</div>
+     <div class="muted" style="font-size:12px">${esc(o.addr.name)} · ${cityName(cityOf(o.addr.city))} · ${o.pay==='cardod'?L('بطاقة عند الاستلام','Card on delivery'):L('نقدًا','Cash')}</div></div>
+    <b class="tn" style="font-size:16px">${money(o.total)}</b>${accBtns(o)}</div>`).join('')}</section>`;
+}
+
 /* ───── pages ───── */
 
 /* ───── completed vs not-completed orders ───── */
@@ -1493,13 +1520,14 @@ function aHome(){
   const inc=siteIncome(),pend=Object.values(AD_.shops).filter(s=>s.status==='pending'),pays=AD_.pays.filter(p=>p.status==='pending'),reps=AD_.reports.filter(r=>r.status==='open');
   const owed=Object.values(AD_.shops).reduce((a,s)=>a+shopBalance(s).owed,0);
   const live=Object.values(D.ads).filter(adLive).length;
-  return`<div class="kpis"><div class="hi"><b>${money(inc.total)}</b>${L('دخل نيل +','NILE+ income')}</div><button class="kbtn" data-kdet="comm"><b>${money(inc.comm)}</b>${L('عمولات المتاجر','Shop commissions')}<small>${L('التفاصيل ‹','Details ›')}</small></button><div><b>${money(inc.fees)}</b>${L('رسوم التوصيل والدفع','Delivery & payment fees')}</div><button class="kbtn" data-kdet="ads"><b>${money(inc.ads)}</b>${L('رسوم إعلانات الأفراد','Individual ad fees')}<small>${L('التفاصيل ‹','Details ›')}</small></button><button class="kbtn" data-atab="banners"><b>${money(inc.bnr)}</b>${L('البانرات الإعلانية','Advertising banners')}<small>${L('التفاصيل ‹','Details ›')}</small></button>
+  return`${demoNote()}<div class="kpis"><div class="hi"><b>${money(inc.total)}</b>${L('دخل نيل +','NILE+ income')}</div><button class="kbtn" data-kdet="comm"><b>${money(inc.comm)}</b>${L('عمولات المتاجر','Shop commissions')}<small>${L('التفاصيل ‹','Details ›')}</small></button><div><b>${money(inc.fees)}</b>${L('رسوم التوصيل والدفع','Delivery & payment fees')}</div><button class="kbtn" data-kdet="ads"><b>${money(inc.ads)}</b>${L('رسوم إعلانات الأفراد','Individual ad fees')}<small>${L('التفاصيل ‹','Details ›')}</small></button><button class="kbtn" data-atab="banners"><b>${money(inc.bnr)}</b>${L('البانرات الإعلانية','Advertising banners')}<small>${L('التفاصيل ‹','Details ›')}</small></button>
     <div><b>${money(inc.gmv)}</b>${L('قيمة الطلبات','Order value')}</div><div><b>${num(inc.n)}</b>${L('طلبات قائمة ومكتملة','Active & completed orders')}</div><button class="kbtn" data-kdet="owed"><b class="${owed?'redc':''}">${money(owed)}</b>${L('مستحق للمتاجر الحين','Owed to shops now')}<small>${L('التفاصيل ‹','Details ›')}</small></button>
     <div><b>${num(Object.values(AD_.shops).filter(s=>s.status==='approved').length)}</b>${L('متاجر معتمدة','Approved shops')}</div><div><b>${num(live)}</b>${L('إعلانات أفراد ظاهرة','Live individual ads')}</div><div><b>${num(AD_.users.length)}</b>${L('مستخدمين','Users')}</div></div>
+   ${newOrdersPanel()}
    ${ordersSummary()}
    <div class="two">
     <section class="panel" style="margin:0"><h3 class="h3">${L('يحتاج قرارك','Needs your decision')}</h3>
-     ${pend.length||pays.length||reps.length||owed?`<ul class="todo">${pend.length?`<li><button class="lnk" data-atab="apps">${L(`${num(pend.length)} طلب تسجيل شركة`,`${pend.length} company registrations`)}</button></li>`:''}
+     ${pend.length||pays.length||reps.length||owed||newOrders().length?`<ul class="todo">${newOrders().length?`<li><button class="lnk" data-aordgo="new">${L(`${num(newOrders().length)} طلب جديد ينتظر قبولك`,`${newOrders().length} new orders to accept`)}</button></li>`:''}${pend.length?`<li><button class="lnk" data-atab="apps">${L(`${num(pend.length)} طلب تسجيل شركة`,`${pend.length} company registrations`)}</button></li>`:''}
       ${pays.length?`<li><button class="lnk" data-atab="ads">${L(`${num(pays.length)} دفعة إعلان تنتظر التأكيد`,`${pays.length} ad payments to confirm`)}</button></li>`:''}
       ${reps.length?`<li><button class="lnk" data-atab="reports">${L(`${num(reps.length)} بلاغ مفتوح`,`${reps.length} open reports`)}</button></li>`:''}
       ${revN()?`<li><button class="lnk" data-atab="review">${L(`${num(revN())} منشور ينتظر قرارك في المراجعة`,`${revN()} posts waiting for your review decision`)}</button></li>`:''}
@@ -1509,7 +1537,7 @@ function aHome(){
 function aApps(){
   const l=Object.values(AD_.shops).filter(s=>s.status==='pending'||(AS.shopF==='all'&&s.status==='rejected')).sort((a,b)=>(a.status==='pending'?-1:1)-(b.status==='pending'?-1:1)||a.createdAt-b.createdAt);
   return l.length?l.map(s=>{const p=AD_.priv[s.id]||{},doc=p.file&&AD_.docs[p.file];
-    return`<section class="panel appcard"><div class="orow"><div style="display:flex;gap:10px;align-items:center">${logo(s,48)}<div><b style="font-size:17px">${sname(s)}</b><div class="muted" style="font-size:12.5px">${L('قدّم','Submitted')} ${fmtFull(s.createdAt)}</div></div></div>${shopStatus(s)}</div>
+    return`<section class="panel appcard"><div class="orow"><div style="display:flex;gap:10px;align-items:center">${logo(s,48)}<div><b style="font-size:17px">${sname(s)}</b> ${demoTag(s)}<div class="muted" style="font-size:12.5px">${L('قدّم','Submitted')} ${fmtFull(s.createdAt)}</div></div></div>${shopStatus(s)}</div>
      <div class="two" style="margin-top:12px"><dl class="kv" style="font-size:14px"><dt>${L('السجل التجاري','Commercial reg.')}</dt><dd dir="ltr" style="text-align:start" class="sel"><b>${esc(s.cr)}</b></dd><dt>${L('النشاط التجاري','Activity')}</dt><dd>${esc(s.activity)}</dd>
        <dt>${L('المدير المخوّل','Authorised manager')}</dt><dd class="sel">${esc(p.manager||'—')}</dd><dt>${L('رقم التواصل','Contact number')}</dt><dd dir="ltr" style="text-align:start" class="sel">${esc(p.phone||'—')}</dd>
        <dt>${L('البريد','Email')}</dt><dd dir="ltr" style="text-align:start" class="sel">${esc(p.email||'—')}</dd><dt>${L('حساب المسجّل','Account')}</dt><dd>${uname(s.owner)}</dd>
@@ -1525,7 +1553,7 @@ function aApps(){
 function aShops(){
   const l=Object.values(AD_.shops).filter(s=>s.status!=='pending'&&s.status!=='rejected');
   return l.length?`<div class="tbl-wrap"><table class="adm"><tr><th>${L('المتجر','Shop')}</th><th>${L('الحالة','Status')}</th><th>${L('العمولة ٪','Commission %')}</th><th>${L('المبيعات','Sales')}</th><th>${L('عمولتنا','Our commission')}</th><th>${L('في الطريق/محجوز','In transit/held')}</th><th>${L('مستحق لهم','Owed to them')}</th><th>${L('موثّق','Verified')}</th><th>${L('يشحنه نيل +','NILE+ ships')}</th><th></th></tr>
-   ${l.map(s=>{const b=shopBalance(s),p=AD_.priv[s.id]||{};return`<tr><td><div class="tp2">${logo(s,30)}<div><a href="index.html?s=${s.id}" target="_blank" rel="noopener">${sname(s)}</a><div class="muted" style="font-size:12px">${esc(p.manager||'')} · <span dir="ltr">${esc(p.phone||'')}</span></div></div></div></td>
+   ${l.map(s=>{const b=shopBalance(s),p=AD_.priv[s.id]||{};return`<tr><td><div class="tp2">${logo(s,30)}<div><a href="index.html?s=${s.id}" target="_blank" rel="noopener">${sname(s)}</a> ${demoTag(s)}<div class="muted" style="font-size:12px">${esc(p.manager||'')} · <span dir="ltr">${esc(p.phone||'')}</span></div></div></div></td>
     <td>${shopStatus(s)}</td><td><input class="inp" style="width:80px;min-height:32px" type="number" min="0" max="50" step="0.5" value="${s.comm}" data-scomm="${s.id}" aria-label="${L('العمولة','Commission')}"></td>
     <td class="tn">${money(b.sales)}</td><td class="tn">${money(b.comm)}</td><td class="tn">${money(b.transit+b.held)}</td><td class="tn ${b.owed?'redc':''}"><b>${money(b.owed)}</b></td>
     <td><label class="chk"><input type="checkbox" data-sflag="${s.id}" data-k="verified" ${s.ver?'checked':''} aria-label="${L('موثّق','Verified')}"></label></td>
@@ -1539,28 +1567,28 @@ function aAds(){
   const all=Object.values(D.ads).sort((a,b)=>b.createdAt-a.createdAt);
   return`<section class="panel"><h3 class="h3">${L('دفعات تنتظر التأكيد','Payments to confirm')} (${num(pend.length)})</h3>
    <p class="muted" style="font-size:12.5px;margin:0 0 8px">${L(`تأكد إن المبلغ وصلك قبل التأكيد. بعد التأكيد يظهر الإعلان ${num(S2().adDays)} يوم.`,`Check the money arrived before confirming. Once confirmed the ad shows for ${S2().adDays} days.`)}</p>
-   ${pend.length?pend.map(p=>{const a=D.ads[p.ad]||{};return`<div class="payrow"><div style="flex:1;min-width:220px"><b dir="auto">${esc(a.t||'—')}</b> <span class="muted">· ${money(a.p||0)}</span><div class="muted" style="font-size:12.5px">${uname(p.uid)}</div></div>
+   ${pend.length?pend.map(p=>{const a=D.ads[p.ad]||{};return`<div class="payrow"><div style="flex:1;min-width:220px">${pBadge('inl')}<b dir="auto">${esc(a.t||'—')}</b> ${demoTag(a)} <span class="muted">· ${money(a.p||0)}</span><div class="muted" style="font-size:12.5px">${uname(p.uid)}</div></div>
      <div><b class="tn">${money(p.amount)}</b><div class="muted" style="font-size:12.5px">${{transfer:L('تحويل بنكي','Bank transfer'),cash:L('نقدًا','Cash'),other:L('أخرى','Other')}[p.method]} · <span dir="ltr" class="sel">${esc(p.ref||'—')}</span> · ${ago(p.at)}${p.kind==='renew'?' · '+L('تجديد','Renewal'):''}</div></div>
      <div class="acts2"><a class="lnk" href="index.html?ad=${p.ad}" target="_blank" rel="noopener">${L('شوف الإعلان','View ad')}</a><button class="btn red" style="width:auto" data-payok="${p.id}">✓ ${L('وصل المبلغ','Payment received')}</button>
       <input class="inp" id="pn_${p.id}" maxlength="300" placeholder="${L('سبب الرفض','Reason')}" style="width:160px"><button class="btn out" style="width:auto" data-payno="${p.id}">✖ ${L('ما وصل','Not received')}</button></div></div>`;}).join(''):`<p class="muted" style="margin:0">${L('ما فيه دفعات تنتظر.','No payments waiting.')}</p>`}</section>
    <section class="panel"><h3 class="h3">${L('كل الإعلانات','All ads')}</h3>${all.length?`<div class="tbl-wrap"><table class="adm"><tr><th>${L('الإعلان','Ad')}</th><th>${L('صاحبه','Owner')}</th><th>${L('السعر','Price')}</th><th>${L('الحالة','Status')}</th><th>${L('ظاهر لين','Live until')}</th><th></th></tr>
-    ${all.map(a=>`<tr><td><a href="index.html?ad=${a.id}" target="_blank" rel="noopener" dir="auto">${esc(a.t)}</a></td><td>${uname(a.uid)}</td><td class="tn">${money(a.p)}</td><td>${adLive(a)?`<span class="stp st-delivered">${L('ظاهر','Live')}</span>`:`<span class="stp st-placed">${esc({awaiting_payment:L('ينتظر الدفع','Awaiting payment'),live:L('منتهي','Expired'),sold:L('انباع','Sold'),removed:L('محذوف','Removed'),rejected:L('مرفوض','Rejected')}[a.status]||a.status)}</span>`}</td>
+    ${all.map(a=>`<tr><td><a href="index.html?ad=${a.id}" target="_blank" rel="noopener" dir="auto">${esc(a.t)}</a> ${demoTag(a)}</td><td>${uname(a.uid)}</td><td class="tn">${money(a.p)}</td><td>${adLive(a)?`<span class="stp st-delivered">${L('ظاهر','Live')}</span>`:`<span class="stp st-placed">${esc({awaiting_payment:L('ينتظر الدفع','Awaiting payment'),live:L('منتهي','Expired'),sold:L('انباع','Sold'),removed:L('محذوف','Removed'),rejected:L('مرفوض','Rejected')}[a.status]||a.status)}</span>`}</td>
      <td>${a.until?fmtFull(a.until):'—'}</td><td>${['live','awaiting_payment'].includes(a.status)?`<button class="lnk" data-adkill="${a.id}">${L('احذف','Remove')}</button>`:''}</td></tr>`).join('')}</table></div>`:`<p class="muted" style="margin:0">${L('ما فيه إعلانات.','No ads.')}</p>`}</section>`;
 }
 const NEXT={placed:['packed','cancelled'],packed:['shipped','cancelled'],shipped:['out','delivered'],out:['delivered'],return_req:['returned','return_rej'],returned:['refunded']};
 function aOrders(){
-  const F=[['all',L('الكل','All'),()=>true],...OB_().map(([k,t,,f])=>[k,t,f]),['notdone',L('لم تتم','Not completed'),o=>!OB_()[0][3](o)]];
+  const F=[['all',L('الكل','All'),()=>true],['new',L('جديدة تنتظر قبولك','New, to accept'),o=>o.status==='placed'],...OB_().map(([k,t,,f])=>[k,t,f]),['notdone',L('لم تتم','Not completed'),o=>!OB_()[0][3](o)]];
   const os=perOrders(),f=(F.find(x=>x[0]===AS.ordF)||F[0])[2],l=os.filter(f).sort((a,b)=>b.createdAt-a.createdAt),t=sumOf(l);
   return`${perChips()}<div class="chips">${F.map(x=>`<button class="chip" data-aordf="${x[0]}" aria-pressed="${AS.ordF===x[0]}">${x[1]} (${num(os.filter(x[2]).length)})</button>`).join('')}</div>
    <div class="kpis" style="margin-top:0"><div><b>${num(t.n)}</b>${L('طلب','orders')}</div><div><b>${money(t.total)}</b>${L('قيمة الطلبات','Order value')}</div><div><b>${money(t.sales)}</b>${L('قيمة المنتجات','Items value')}</div><div><b>${money(t.comm)}</b>${L('العمولة','Commission')}</div></div>
    ${l.length?`<div class="tbl-wrap"><table class="adm"><tr><th>${L('الطلب','Order')}</th><th>${L('التاريخ','Date')}</th><th>${L('المتجر','Shop')}</th><th>${L('العميل','Customer')}</th><th>${L('المبلغ','Amount')}</th><th>${L('عمولتنا','Our commission')}</th><th>${L('الحالة','Status')}</th><th>${L('إجراء','Action')}</th></tr>
-   ${l.slice(0,300).map(o=>`<tr><td class="tn" dir="ltr">${esc(o.no)}</td><td>${fmtFull(o.createdAt)}</td><td>${sname(store(o.s))}</td><td>${esc(o.addr.name)}<div class="muted" style="font-size:12px" dir="ltr">${esc(o.addr.phone)}</div></td><td class="tn">${money(o.total)}</td><td class="tn">${money(orderMoney(o).comm)}</td><td>${statusPill(o.status)}</td>
-    <td>${NEXT[o.status]?`<div class="acts2"><select class="inp" id="na_${o.id}" style="width:auto;min-height:32px">${NEXT[o.status].map(k=>`<option value="${k}">${tx(ST[k])}</option>`).join('')}</select><button class="lnk" data-oact="${o.id}">${L('نفّذ','Apply')}</button></div>`:''}</td></tr>`).join('')}</table></div>`:`<div class="panel" style="text-align:center"><p class="muted">${L('ما فيه طلبات هنا.','No orders here.')}</p></div>`}`;
+   ${l.slice(0,300).map(o=>`<tr><td class="tn" dir="ltr">${esc(o.no)}</td><td>${fmtFull(o.createdAt)}</td><td>${sname(store(o.s))} ${demoTag(store(o.s))}</td><td>${esc(o.addr.name)}<div class="muted" style="font-size:12px" dir="ltr">${esc(o.addr.phone)}</div></td><td class="tn">${money(o.total)}</td><td class="tn">${money(orderMoney(o).comm)}</td><td>${statusPill(o.status)}</td>
+    <td>${o.status==='placed'?accBtns(o):NEXT[o.status]?`<div class="acts2"><select class="inp" id="na_${o.id}" style="width:auto;min-height:32px">${NEXT[o.status].map(k=>`<option value="${k}">${tx(ST[k])}</option>`).join('')}</select><button class="lnk" data-oact="${o.id}">${L('نفّذ','Apply')}</button></div>`:''}</td></tr>`).join('')}</table></div>`:`<div class="panel" style="text-align:center"><p class="muted">${L('ما فيه طلبات هنا.','No orders here.')}</p></div>`}`;
 }
 function aProducts(){
   const l=Object.values(D.products).sort((a,b)=>b.createdAt-a.createdAt);
   return l.length?`<div class="tbl-wrap"><table class="adm"><tr><th>${L('المنتج','Product')}</th><th>${L('المتجر','Shop')}</th><th>${L('السعر','Price')}</th><th>${L('المخزون','Stock')}</th><th>${L('المبيعات','Sold')}</th><th>${L('البلاغات','Reports')}</th><th>${L('ظاهر','Visible')}</th></tr>
-   ${l.map(p=>{const n=AD_.reports.filter(r=>r.ref===p.id).length;return`<tr><td><div class="tp2"><span class="e">${pimg(p)}</span><a class="clamp2" href="index.html?p=${p.id}" target="_blank" rel="noopener">${pname(p)}</a></div></td><td>${sname(store(p.s))}</td><td class="tn">${money(p.p)}</td><td class="tn">${num(p.stock)}</td><td class="tn">${num(p.sold)}</td><td class="tn ${n?'redc':''}">${num(n)}</td>
+   ${l.map(p=>{const n=AD_.reports.filter(r=>r.ref===p.id).length;return`<tr><td><div class="tp2"><span class="e">${pimg(p)}</span><a class="clamp2" href="index.html?p=${p.id}" target="_blank" rel="noopener">${pname(p)}</a></div></td><td>${sname(store(p.s))} ${demoTag(store(p.s))}</td><td class="tn">${money(p.p)}</td><td class="tn">${num(p.stock)}</td><td class="tn">${num(p.sold)}</td><td class="tn ${n?'redc':''}">${num(n)}</td>
     <td><label class="chk"><input type="checkbox" data-phide="${p.id}" ${p.hidden?'':'checked'} aria-label="${L('ظاهر','Visible')}: ${pname(p)}"></label></td></tr>`;}).join('')}</table></div>`:`<div class="panel" style="text-align:center"><p class="muted">${L('ما فيه منتجات.','No products.')}</p></div>`;
 }
 function aReports(){
@@ -1646,10 +1674,10 @@ function aReview(){
   const ai=AD_.ai||{},l=revItems().sort((a,b)=>(a.x.mod==='flagged'?-1:1)-(b.x.mod==='flagged'?-1:1));
   const recent=[...Object.values(D.ads).filter(a=>a.mod==='approved').map(a=>({k:'ad',x:a})),...Object.values(D.products).filter(p=>p.mod==='approved').map(p=>({k:'product',x:p}))].sort((a,b)=>b.x.createdAt-a.x.createdAt).slice(0,15);
   const card=({k,x})=>{const ad=k==='ad',title=ad?esc(x.t):pname(x),imgs=x.imgs.slice(0,4),link=ad?`index.html?ad=${x.id}`:`index.html?p=${x.id}`;
-    return`<section class="panel revcard ${x.mod}"><div class="orow"><div><span class="stp ${ad?'st-placed':'st-packed'}">${ad?L('إعلان فرد','Individual ad'):L('منتج شركة','Company product')}</span> ${x.mod==='flagged'?`<span class="stp st-return_req">⚠ ${L('الذكاء الاصطناعي عنده ملاحظات','AI has concerns')}</span>`:`<span class="stp st-placed">🔍 ${L('ينتظر الفحص الآلي','Waiting for AI check')}</span>`}</div><span class="muted" style="font-size:12px">${ago(x.createdAt)}</span></div>
+    return`<section class="panel revcard ${x.mod}"><div class="orow"><div>${ad?pBadge('inl'):''}<span class="stp ${ad?'st-placed':'st-packed'}">${ad?L('إعلان فرد (حساب شخصي)','Individual ad (personal account)'):L('منتج شركة','Company product')}</span> ${demoTag(ad?x:store(x.s))} ${x.mod==='flagged'?`<span class="stp st-return_req">⚠ ${L('الذكاء الاصطناعي عنده ملاحظات','AI has concerns')}</span>`:`<span class="stp st-placed">🔍 ${L('ينتظر الفحص الآلي','Waiting for AI check')}</span>`}</div><span class="muted" style="font-size:12px">${ago(x.createdAt)}</span></div>
      <div style="display:flex;gap:12px;margin-top:10px;flex-wrap:wrap"><div class="revimgs">${imgs.length?imgs.map(i=>`<a href="${IMG(i)}" target="_blank" rel="noopener"><img src="${IMG(i)}" alt=""></a>`).join(''):`<span class="emo" style="font-size:44px">${x.e}</span>`}</div>
       <div style="flex:1;min-width:220px"><b dir="auto" style="font-size:16px">${title}</b><div class="tn" style="font-size:17px">${money(x.p)}${!ad&&x.o?` <s class="muted">${money(x.o)}</s>`:''}</div>
-       <div class="muted" style="font-size:12.5px">${ad?`${uname(x.uid)} · ${x.cond==='new'?L('جديد','New'):L('مستعمل','Used')} · ${cityName(cityOf(x.city))}`:`${sname(store(x.s))}`}</div>
+       <div class="muted" style="font-size:12.5px">${ad?`${L('صاحب الحساب:','Account owner:')} ${uname(x.uid)} · ${x.cond==='new'?L('جديد','New'):L('مستعمل','Used')} · ${cityName(cityOf(x.city))}`:`${sname(store(x.s))}`}</div>
        ${ad&&x.d?`<p dir="auto" style="white-space:pre-wrap;font-size:13.5px;margin:6px 0">${esc(x.d)}</p>`:''}
        ${x.modWhy.length?`<div class="modbox m-flagged"><b>${L('ملاحظات المراجعة:','Review notes:')}</b><ul>${x.modWhy.map(r=>`<li dir="auto">${esc(r)}</li>`).join('')}</ul></div>`:''}
        ${ad&&x.status==='awaiting_payment'?`<p class="muted" style="font-size:12.5px;margin:4px 0">${L('ودفعته للحين ما تأكدت.','Its payment isn’t confirmed yet.')}</p>`:''}</div></div>
@@ -1731,7 +1759,7 @@ function render(){
     <p class="muted" style="font-size:12.5px">${L('مسجّل باسم','Signed in as')} <span dir="ltr">${esc(ME.email)}</span> · <button class="lnk" data-aact="signout">${L('خروج','Sign out')}</button></p></section></div>`;return;}
   const pend=Object.values(AD_.shops).filter(s=>s.status==='pending').length,pays=AD_.pays.filter(p=>p.status==='pending').length,reps=AD_.reports.filter(r=>r.status==='open').length;
   const tabs=[['home',L('نظرة عامة','Overview')],['apps',L('طلبات الشركات','Company requests')+(pend?` (${num(pend)})`:'')],['shops',L('المتاجر والتحويلات','Shops & transfers')],['review',L('المراجعة','Review')+(revN()?` (${num(revN())})`:'')],['ads',L('إعلانات الأفراد','Individual ads')+(pays?` (${num(pays)})`:'')],
-    ['orders',L('الطلبات','Orders')],['products',L('المنتجات','Products')],['banners',L('البانرات','Banners')],['reports',L('البلاغات','Reports')+(reps?` (${num(reps)})`:'')],['users',L('المستخدمين','Users')],['settings',L('الإعدادات','Settings')]];
+    ['orders',L('الطلبات','Orders')+(newOrders().length?` (${num(newOrders().length)})`:'')],['products',L('المنتجات','Products')],['banners',L('البانرات','Banners')],['reports',L('البلاغات','Reports')+(reps?` (${num(reps)})`:'')],['users',L('المستخدمين','Users')],['settings',L('الإعدادات','Settings')]];
   const body=AS.detail?{ads:aDetAds,comm:aDetComm,owed:aDetOwed}[AS.detail]:{home:aHome,banners:aBanners,review:aReview,apps:aApps,shops:aShops,ads:aAds,orders:aOrders,products:aProducts,reports:aReports,users:aUsers,settings:aSettings}[AS.tab]||aHome;
   v.innerHTML=`<div class="wrap"><section style="margin-top:16px"><div class="orow"><h2 style="font-size:24px;margin:0">${L('لوحة تحكم نيل +','NILE+ dashboard')}</h2><span class="muted" style="font-size:13px"><span dir="ltr">${esc(ME.email)}</span> · <button class="lnk" data-aact="reload">↻ ${L('تحديث','Refresh')}</button> · <button class="lnk" data-aact="signout">${L('خروج','Sign out')}</button></span></div>
    <div class="tabs" style="margin:12px 0 14px">${tabs.map(([k,l])=>`<button data-atab="${k}" aria-selected="${AS.tab===k}">${l}</button>`).join('')}</div>
@@ -1766,6 +1794,9 @@ document.addEventListener('click',e=>{
   if(el=g('[data-payok]')){const id=el.dataset.payok;return act(()=>rpc('admin_ad_payment',{p_payment:id,p_approve:true,p_note:''}),L('تأكد الدفع ونزل الإعلان','Payment confirmed; the ad is live'));}
   if(el=g('[data-payno]')){const id=el.dataset.payno,n=$('#pn_'+id).value.trim();if(!n)return toast(L('اكتب السبب.','Enter the reason.'),true);return act(()=>rpc('admin_ad_payment',{p_payment:id,p_approve:false,p_note:n}),L('انرفضت الدفعة','Payment rejected'));}
   if(el=g('[data-adkill]')){const id=el.dataset.adkill;return act(async()=>{const r=await ME.sb.from('ads').update({status:'removed',status_note:L('حذفته إدارة نيل +','Removed by NILE+')}).eq('id',id);if(r.error)throw r.error;},L('انحذف الإعلان','Ad removed'));}
+  if(el=g('[data-oacc]')){const id=el.dataset.oacc;return act(()=>rpc('order_action',{p_id:id,p_action:'packed',p_note:'',p_carrier:null,p_tracking:null}),L('قبلت الطلب، وصار قيد التجهيز','Order accepted; it’s being prepared'));}
+  if(el=g('[data-orej]')){const id=el.dataset.orej;return aModal(L('رفض الطلب','Reject the order'),`<p class="muted">${L('ينلغي الطلب ويرجع المخزون، والسبب يوصل للعميل.','The order is cancelled, the stock goes back and the customer sees the reason.')}</p>${fld('ox_n',L('السبب','Reason'),inp('ox_n','','maxlength="300"'),true)}`,L('ارفض الطلب','Reject order'),
+    ()=>{const n=$('#ox_n').value.trim();if(!n)throw {message:L('اكتب السبب.','Enter the reason.')};return rpc('order_action',{p_id:id,p_action:'cancelled',p_note:n,p_carrier:null,p_tracking:null});});}
   if(el=g('[data-oact]')){const id=el.dataset.oact,to=$('#na_'+id).value;const needs=['cancelled','return_rej'].includes(to);
     if(to==='shipped')return aModal(L('شحن الطلب','Ship the order'),`<div class="form">${fld('sh_c',L('شركة الشحن','Carrier'),sel('sh_c',CARRIERS.map(c=>[c[0],S.ar?c[1]:c[2]]),'nile'))}${fld('sh_n',L('رقم التتبع','Tracking number'),inp('sh_n','','maxlength="40" dir="ltr"'))}</div>`,L('تأكيد','Confirm'),
       ()=>rpc('order_action',{p_id:id,p_action:'shipped',p_note:'',p_carrier:$('#sh_c').value,p_tracking:$('#sh_n').value.trim()}));
@@ -1777,7 +1808,9 @@ document.addEventListener('click',e=>{
   if(el=g('[data-ban]')){const id=el.dataset.ban,v=el.dataset.v==='1';return act(async()=>{const r=await ME.sb.from('profiles').update({banned:v}).eq('id',id);if(r.error)throw r.error;},v?L('انوقف الحساب','Account suspended'):L('رجع الحساب','Account restored'));}
   if(el=g('[data-mclose]')){aHide();return;}
   if(el=g('[data-mok]')){const fn=aModal.fn;if(!fn)return;el.disabled=true;Promise.resolve().then(fn).then(()=>{aHide();toast(L('تم','Done'));aLoad();},x=>{el.disabled=false;const e=$('#merr');e.textContent=x&&x.message&&!/^[a-z_:]+/.test(x.message)?x.message:dbErr(x);e.hidden=false;});return;}
-  if(el=g('[data-aact]')){const a=el.dataset.aact;if(a==='signout')ME.sb.auth.signOut();if(a==='reload')aLoad();return;}
+  if(el=g('[data-aact]')){const a=el.dataset.aact;
+    if(a==='cleardemo'){const c=demoCount();return aModal(L('حذف البيانات التجريبية؟','Delete the sample data?'),`<p class="muted">${L(`ينحذف كل شي عليه علامة «تجريبي»: ${num(c.shops)} متاجر ومنتجاتها، ${num(c.orders)} طلب، ${num(c.ads)} إعلان، وحسابات العملاء التجريبيين. بياناتك الحقيقية ما تنلمس. ما تقدر ترجعها بعد الحذف.`,`Everything marked “Sample” is deleted: ${c.shops} shops and their products, ${c.orders} orders, ${c.ads} ads and the sample customer accounts. Your real data isn’t touched. This can’t be undone.`)}</p>`,L('احذفها','Delete it'),()=>rpc('admin_clear_demo'));}
+    if(a==='signout')ME.sb.auth.signOut();if(a==='reload')aLoad();return;}
   if(e.target.id==='scrim')aHide();
 });
 document.addEventListener('change',e=>{
