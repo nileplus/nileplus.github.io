@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>نيل +</title>
+<meta name="description" content="نيل +: سوق إلكتروني في قطر. تسوّق من شركات قطرية بالدفع عند الاستلام، أو أعلن عن غرضك.">
+<meta name="theme-color" content="#0c0c0c">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="css/app.css?v=1792502811">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+</head>
+<body>
+<header>
+  <div class="top"><div class="wrap">
+    <button class="hbtn menu-btn" data-act="menu" aria-label="menu"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
+    <button class="logo" data-act="home">NILE<span>+</span></button>
+    <button class="hbtn d-only" data-act="city"><small id="hDel1"></small><b>📍 <span id="hDel2"></span></b></button>
+    <form class="search" id="sform" role="search">
+      <select id="scat" aria-label="category"></select>
+      <input id="q" type="search" autocomplete="off" aria-label="search">
+      <button type="submit" aria-label="search"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></button>
+    </form>
+    <button class="hbtn lang" id="lang"></button>
+    <button class="hbtn d-only" data-act="account"><small id="hAcc1"></small><b id="hAcc2"></b></button>
+    <button class="hbtn d-only" data-act="orders"><small id="hOrd1"></small><b id="hOrd2"></b></button>
+    <button class="hbtn bell" id="bell" data-act="notifs"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 16V11a6 6 0 1 1 12 0v5l2 2H4l2-2Z"/><path d="M10 20a2 2 0 0 0 4 0"/></svg><span id="bn"></span></button>
+    <button class="hbtn cart-h" data-act="cart" aria-label="cart">
+      <svg width="34" height="30" viewBox="0 0 34 30" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 4h5l4 17h16l3-12H9"/><circle cx="13" cy="26" r="2"/><circle cx="25" cy="26" r="2"/></svg>
+      <span class="n" id="cnt"></span><b class="d-only" id="hCart"></b>
+    </button>
+  </div></div>
+  <div class="m-search"><div class="wrap"><form class="search" id="mform" role="search"><input id="mq" type="search" autocomplete="off" aria-label="search"><button type="submit" aria-label="search"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></button></form></div></div>
+  <nav class="sub"><div class="wrap" id="sub"></div></nav>
+  <div class="deliver-m"><div class="wrap"><button data-act="city" id="mDel"></button></div></div>
+  <div class="robar" id="robar" hidden></div>
+</header>
+
+<main>
+  <div id="view"></div>
+  <button class="totop" data-act="top" id="totop"></button>
+  <footer><div class="wrap cols" id="fcols"></div><div class="base"><div class="logo">NILE<span>+</span></div><div id="fcopy"></div></div></footer>
+</main>
+
+<nav class="mbar" id="mbar"></nav>
+<div class="scrim" id="scrim" hidden></div>
+<aside class="sheet" id="sheet" hidden role="dialog" aria-modal="true"></aside>
+<div class="toast" id="toast" hidden role="status" aria-live="polite"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="js/config.js?v=1792502811"></script>
+<script src="js/app.js?v=1792502811"></script>
+</body>
+</html>
